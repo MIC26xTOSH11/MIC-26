@@ -2,11 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import FederatedBlockchain from "@/components/FederatedBlockchain";
 import WorldHeatmapLeaflet from "@/components/WorldHeatmapLeaflet";
 import ThemeToggle from "@/components/ThemeToggle";
 import SystemMonitor from "@/components/SystemMonitor";
-import BlockchainGraph from "@/components/BlockchainGraph";
 
 export default function SuperUserPage() {
   const router = useRouter();
@@ -82,27 +80,9 @@ export default function SuperUserPage() {
             <SystemMonitor />
           </div>
 
-          {/* Blockchain Network Topology Graph */}
-          <div>
-            <div className="mb-6">
-              <h2 className="text-2xl font-semibold text-white">Network Architecture</h2>
-              <p className="mt-1 text-sm text-slate-400">
-                Dynamic visualization of federated blockchain topology
-              </p>
-            </div>
-            <BlockchainGraph />
-          </div>
+          {/* Network topology visualization removed - focusing on text disinformation MVP */}
 
-          {/* Federated Blockchain */}
-          <div>
-            <div className="mb-6">
-              <h2 className="text-2xl font-semibold text-white">Federated Blockchain Ledger</h2>
-              <p className="mt-1 text-sm text-slate-400">
-                Distributed node management, chain validation, and synchronization
-              </p>
-            </div>
-            <FederatedBlockchain />
-          </div>
+          {/* Blockchain feature removed - focusing on text disinformation MVP */}
 
           {/* World Heatmap */}
           <div>

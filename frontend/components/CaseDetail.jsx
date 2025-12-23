@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import RadarChart from "./RadarChart";
-import HopTraceMap from "./HopTraceMap";
 
 const riskBadgeClasses = {
   "high-risk":
@@ -20,9 +19,6 @@ const defaultShareForm = {
 export default function CaseDetail({
   caseData,
   submission,
-  onShare,
-  sharePending,
-  shareOutput,
 }) {
   const [formState, setFormState] = useState(defaultShareForm);
   const [showRiskWarning, setShowRiskWarning] = useState(false);
@@ -107,33 +103,12 @@ export default function CaseDetail({
       intake_id: caseData.intake_id,
     };
     
-    // Check if this is a high-risk case
-    const classification = (caseData.classification || "").toLowerCase();
-    const isHighRisk = classification === "high-risk" || 
-                       (typeof caseData.composite_score === "number" && caseData.composite_score >= 0.7);
-    
-    if (isHighRisk) {
-      // Show warning dialog for high-risk packages
-      setPendingShareData(shareData);
-      setShowRiskWarning(true);
-    } else {
-      // Proceed normally for low/medium risk
-      await onShare(shareData);
-    }
+    // Sharing feature removed - focusing on text disinformation MVP
+    // High-risk warning and package building removed
   };
   
-  const handleConfirmHighRiskShare = async () => {
-    setShowRiskWarning(false);
-    if (pendingShareData) {
-      await onShare(pendingShareData);
-      setPendingShareData(null);
-    }
-  };
-  
-  const handleCancelHighRiskShare = () => {
-    setShowRiskWarning(false);
-    setPendingShareData(null);
-  };
+  // const handleConfirmHighRiskShare = async () => { ... }
+  // const handleCancelHighRiskShare = () => { ... }
 
   return (
     <aside className="flex flex-col gap-8 rounded-3xl border border-white/5 bg-slate-900/80 p-6 shadow-2xl shadow-black/50 backdrop-blur">
@@ -613,115 +588,8 @@ export default function CaseDetail({
         </div>
       </section>
 
-      <section className="space-y-4 rounded-2xl border border-white/10 bg-slate-950/60 px-5 py-5">
-        <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
-            Generate sharing package
-          </h3>
-          <p className="mt-1 text-xs text-slate-400">
-            Wrap the analysis into a signed package for partner dissemination directly through the API.
-          </p>
-        </div>
-        <form className="space-y-4" onSubmit={handleShareSubmit}>
-          <label className="flex flex-col gap-2 text-slate-200">
-            <span className="text-xs uppercase tracking-wide text-slate-400">
-              Destination
-            </span>
-            <select
-              value={formState.destination}
-              onChange={(event) =>
-                setFormState((prev) => ({
-                  ...prev,
-                  destination: event.target.value,
-                }))
-              }
-              className="input"
-            >
-              <option value="USA">USA</option>
-              <option value="EU">EU</option>
-              <option value="IN">IN</option>
-              <option value="AUS">AUS</option>
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-2 text-slate-200">
-            <span className="text-xs uppercase tracking-wide text-slate-400">
-              Justification
-            </span>
-            <textarea
-              value={formState.justification}
-              rows={2}
-              onChange={(event) =>
-                setFormState((prev) => ({
-                  ...prev,
-                  justification: event.target.value,
-                }))
-              }
-              className="input"
-            />
-          </label>
-
-        
-
-          <button
-            type="submit"
-            disabled={sharePending}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-400/20 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-400/30 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Build package
-          </button>
-        </form>
-        {shareOutput ? (
-          <>
-            <pre className="max-h-48 overflow-y-auto rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-xs text-slate-300">
-              {shareOutput}
-            </pre>
-            <HopTraceMap sharePackage={shareOutput} />
-          </>
-        ) : null}
-      </section>
-
-      {/* High Risk Warning Dialog */}
-      {showRiskWarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="mx-4 max-w-md rounded-2xl border border-rose-500/30 bg-slate-900 p-6 shadow-2xl">
-            <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-rose-500/20">
-                <svg className="h-6 w-6 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-rose-200">High Risk Content Warning</h3>
-                <p className="mt-2 text-sm text-slate-300">
-                  The package you are trying to send contains <span className="font-semibold text-rose-300">high-risk content</span> (Risk Score: {Math.round((caseData.composite_score || 0) * 100)}%).
-                </p>
-                <p className="mt-2 text-sm text-slate-400">
-                  Destination: <span className="font-semibold text-white">{formState.destination}</span>
-                </p>
-                <p className="mt-1 text-sm text-slate-400">
-                  Please confirm that you want to proceed with sharing this intelligence package.
-                </p>
-              </div>
-            </div>
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={handleCancelHighRiskShare}
-                className="flex-1 rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmHighRiskShare}
-                disabled={sharePending}
-                className="flex-1 rounded-lg border border-rose-500/40 bg-rose-500/20 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/30 disabled:opacity-50"
-              >
-                {sharePending ? "Processing..." : "Confirm & Send"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Sharing section removed - focusing on text disinformation MVP */}
+      {/* High Risk Warning Dialog removed - sharing feature disabled */}
     </aside>
   );
 }

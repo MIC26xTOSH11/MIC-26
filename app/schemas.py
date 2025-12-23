@@ -114,33 +114,8 @@ class SIEMCorrelationPayload(BaseModel):
     node_count: int
 
 
-class SharingRequest(BaseModel):
-    intake_id: str
-    destination: str
-    justification: str
-    include_personal_data: bool = False
+# Sharing and HopTrace schemas removed - focusing on text disinformation MVP
+# class SharingRequest(BaseModel): ...
+# class HopTrace(BaseModel): ...
+# class SharingPackage(BaseModel): ...
 
-
-class HopTrace(BaseModel):
-    id: str
-    name: str
-    city: str
-    coords: List[float]
-    ip: str
-    provider: str
-    latency: int
-    note: Optional[str] = None
-
-
-class SharingPackage(BaseModel):
-    package_id: str
-    created_at: datetime
-    destination: str
-    policy_tags: List[str]
-    payload: Dict[str, str]
-    signature: str
-    hop_trace: Optional[List[HopTrace]] = None
-    risk_level: str
-    composite_score: float
-    risk_level: str
-    composite_score: float

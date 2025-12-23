@@ -8,16 +8,11 @@ import EventsFeed from "@/components/EventsFeed";
 import CaseTable from "@/components/CaseTable";
 import CaseDetail from "@/components/CaseDetail";
 import Toast from "@/components/Toast";
-import FederatedBlockchain from "@/components/FederatedBlockchain";
-import ImageAnalyzer from "@/components/ImageAnalyzer";
 import WorldHeatmapLeaflet from "@/components/WorldHeatmapLeaflet";
-import BlockchainGraph from "@/components/BlockchainGraph";
-import HopTraceMap from "@/components/HopTraceMap";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
   submitIntake,
   fetchCase,
-  requestSharingPackage,
   createEventStream,
   API_BASE_URL,
 } from "@/lib/api";
@@ -27,8 +22,6 @@ export default function HomePage() {
   const [selectedId, setSelectedId] = useState(null);
   const [events, setEvents] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [sharePending, setSharePending] = useState(false);
-  const [shareOutput, setShareOutput] = useState("");
   const [toast, setToast] = useState({ message: "", tone: "success" });
   const submissionsRef = useRef({});
   const eventControllerRef = useRef(null);
@@ -130,7 +123,6 @@ export default function HomePage() {
   const handleSubmitIntake = async (payload) => {
     try {
       setIsSubmitting(true);
-      setShareOutput("");
       const result = await submitIntake(payload);
       submissionsRef.current[result.intake_id] = payload;
       upsertResult(result);
@@ -162,21 +154,8 @@ export default function HomePage() {
     }
   };
 
-  const handleShare = async (payload) => {
-    try {
-      setSharePending(true);
-      const packagePayload = await requestSharingPackage(payload);
-      setShareOutput(JSON.stringify(packagePayload, null, 2));
-      setToast({ message: "Sharing package generated.", tone: "success" });
-    } catch (error) {
-      setToast({
-        message: error.message || "Unable to generate sharing package.",
-        tone: "error",
-      });
-    } finally {
-      setSharePending(false);
-    }
-  };
+  // Sharing feature removed - focusing on text disinformation MVP
+  // const handleShare = async (payload) => { ... }
 
   const metrics = useMemo(() => {
     const total = results.length;
@@ -322,7 +301,6 @@ export default function HomePage() {
               />
             </div>
 
-            <ImageAnalyzer />
             <EventsFeed events={events} />
           </div>
 
@@ -330,19 +308,7 @@ export default function HomePage() {
             <CaseDetail
               caseData={selectedCase}
               submission={submissionPayload}
-              onShare={handleShare}
-              sharePending={sharePending}
-              shareOutput={shareOutput}
             />
-          </div>
-
-          <div className="mt-12 break-words">
-            <FederatedBlockchain />
-          </div>
-
-          <div className="mt-12 break-words">
-            <BlockchainGraph />
-            <HopTraceMap />
           </div>
 
           <div className="mt-12 break-all">
