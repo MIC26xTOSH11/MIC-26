@@ -1,4 +1,6 @@
 import json
+import logging
+from datetime import datetime
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +19,14 @@ from .services.orchestrator import AnalysisOrchestrator
 from .storage.database import Database
 from .heatmap import router as heatmap_router, record_point
 from .auth.middleware import role_protection
+
+# Configure structured logging for demo mode / Azure pipeline visibility
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger("TattvaDrishti")
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
@@ -76,7 +86,25 @@ async def submit_content(
     if not region or not str(region).strip():
         raise HTTPException(status_code=400, detail="Region (city/district) is required.")
 
+    # Demo mode logging: Azure AI pipeline trace
+    logger.info("="*60)
+    logger.info("🔵 AZURE AI ANALYSIS PIPELINE INITIATED")
+    logger.info(f"📥 Intake ID: Processing new content submission")
+    logger.info(f"📍 Region: {region}")
+    logger.info(f"📝 Content length: {len(payload.text)} characters")
+
     result = await orchestrator.process_intake(payload)
+
+    # Demo mode logging: Azure AI results summary
+    breakdown = result.breakdown or {}
+    logger.info("✅ ANALYSIS COMPLETE")
+    logger.info(f"   └─ Azure OpenAI Score: {breakdown.azure_openai_risk or 'N/A'} (40% weight)")
+    logger.info(f"   └─ Azure Content Safety: {breakdown.azure_safety_score or 'N/A'} (25% weight)")
+    logger.info(f"   └─ HuggingFace AI Detection: {breakdown.ai_probability or 'N/A'}")
+    logger.info(f"   └─ Behavioral Score: {breakdown.behavioral_score or 'N/A'}")
+    logger.info(f"📊 Enterprise Trust Risk Score: {result.composite_score}")
+    logger.info(f"🏷️ Classification: {result.classification}")
+    logger.info("="*60)
 
     # Normalize composite score and record point for heatmap (non-blocking)
     try:
@@ -143,6 +171,72 @@ class FingerprintCheckPayload(BaseModel):
 async def fingerprint_check(payload: FingerprintCheckPayload):
     matches = orchestrator.check_fingerprint(payload.text)
     return {"matches": matches}
+
+
+# ==================== Analyst Decision Endpoints ====================
+
+class AnalystDecisionPayload(BaseModel):
+    """Payload for analyst decision actions (Flag/Monitor/Escalate)."""
+    intake_id: str
+    decision: str  # "flag", "monitor", "escalate", "dismiss"
+    notes: str = ""
+    analyst_id: str = "system"
+
+
+@app.post("/api/v1/cases/{intake_id}/decision")
+async def submit_analyst_decision(
+    request: Request,
+    intake_id: str,
+    payload: AnalystDecisionPayload,
+):
+    """
+    Record an analyst decision for a case.
+    Valid decisions: flag, monitor, escalate, dismiss
+    """
+    # Verify case exists
+    record = database_l1.fetch_case(intake_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Case not found")
+    
+    valid_decisions = {"flag", "monitor", "escalate", "dismiss"}
+    if payload.decision.lower() not in valid_decisions:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid decision. Must be one of: {', '.join(valid_decisions)}"
+        )
+    
+    # Log the decision to audit trail
+    database_l1.log_action(
+        intake_id=intake_id,
+        action=f"analyst_decision:{payload.decision.lower()}",
+        actor=payload.analyst_id,
+        payload={
+            "decision": payload.decision.lower(),
+            "notes": payload.notes,
+            "timestamp": __import__("datetime").datetime.utcnow().isoformat(),
+        },
+    )
+    
+    return {
+        "status": "success",
+        "intake_id": intake_id,
+        "decision": payload.decision.lower(),
+        "message": f"Case marked as '{payload.decision.lower()}' by analyst",
+    }
+
+
+@app.get("/api/v1/cases/{intake_id}/audit")
+async def get_case_audit_trail(request: Request, intake_id: str):
+    """Retrieve immutable audit trail for a case."""
+    audit_entries = database_l1.get_audit_trail(intake_id)
+    return {"intake_id": intake_id, "audit_trail": audit_entries}
+
+
+@app.get("/api/v1/cases")
+async def list_cases(request: Request, limit: int = 50):
+    """List all analyzed cases for dashboard display."""
+    cases = database_l1.list_cases(limit=limit)
+    return {"cases": cases, "count": len(cases)}
 
 
 # ==================== End of API Routes ====================

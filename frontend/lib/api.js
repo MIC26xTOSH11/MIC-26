@@ -35,12 +35,50 @@ export async function fetchCase(intakeId) {
 }
 
 export async function requestSharingPackage(payload) {
-  // Always use main API for sharing - it has the case data
-  const res = await fetch(`${API_BASE_URL}/api/v1/share`, {
+  // Sharing feature removed - focusing on text disinformation MVP
+  throw new Error("Sharing feature has been disabled");
+}
+
+// ==================== Analyst Decision APIs ====================
+
+/**
+ * Submit an analyst decision for a case (Flag/Monitor/Escalate/Dismiss)
+ */
+export async function submitAnalystDecision(intakeId, decision, notes = "", analystId = "analyst") {
+  const res = await fetch(`${API_BASE_URL}/api/v1/cases/${encodeURIComponent(intakeId)}/decision`, {
     method: "POST",
     headers,
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      intake_id: intakeId,
+      decision,
+      notes,
+      analyst_id: analystId,
+    }),
   });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * Fetch audit trail for a case
+ */
+export async function fetchAuditTrail(intakeId) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/cases/${encodeURIComponent(intakeId)}/audit`);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * List all analyzed cases
+ */
+export async function listCases(limit = 50) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/cases?limit=${limit}`);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || `HTTP ${res.status}`);

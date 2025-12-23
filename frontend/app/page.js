@@ -14,6 +14,7 @@ import {
   submitIntake,
   fetchCase,
   createEventStream,
+  listCases,
   API_BASE_URL,
 } from "@/lib/api";
 
@@ -23,8 +24,29 @@ export default function HomePage() {
   const [events, setEvents] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState({ message: "", tone: "success" });
+  const [demoMode, setDemoMode] = useState(false);
   const submissionsRef = useRef({});
   const eventControllerRef = useRef(null);
+
+  // Load existing cases on mount (for demo mode & persistence)
+  useEffect(() => {
+    const loadExistingCases = async () => {
+      try {
+        const data = await listCases(20);
+        if (data.cases && data.cases.length > 0) {
+          setResults((prev) => {
+            const existing = new Set(prev.map((r) => r.intake_id));
+            const newCases = data.cases.filter((c) => !existing.has(c.intake_id));
+            return sortResults([...prev, ...newCases]);
+          });
+          console.log("[TattvaDrishti] Loaded", data.cases.length, "historical cases");
+        }
+      } catch (error) {
+        console.error("[TattvaDrishti] Failed to load cases:", error);
+      }
+    };
+    loadExistingCases();
+  }, []);
 
   useEffect(() => {
     const timer = toast.message
@@ -214,7 +236,23 @@ export default function HomePage() {
           <div className="mx-auto max-w-7xl px-6 py-12 break-normal">
             <div className="flex flex-col gap-10 break-normal">
               <div className="flex flex-wrap items-center justify-between gap-4">
-                <ThemeToggle />
+                <div className="flex items-center gap-4">
+                  <ThemeToggle />
+                  {/* Demo Mode Toggle */}
+                  <button
+                    onClick={() => {
+                      setDemoMode(!demoMode);
+                      console.log(`[TattvaDrishti] Demo Mode ${!demoMode ? "ENABLED" : "DISABLED"} - Azure AI pipeline active`);
+                    }}
+                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition ${
+                      demoMode 
+                        ? "border-emerald-400 bg-emerald-500/20 text-emerald-200" 
+                        : "border-white/10 text-slate-400 hover:border-white/20"
+                    }`}
+                  >
+                    {demoMode ? "🎯 Demo Mode" : "Demo"}
+                  </button>
+                </div>
                 <Link
                   href="/simple"
                   className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-slate-200 transition hover:border-emerald-400 hover:text-emerald-200"

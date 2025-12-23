@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import RadarChart from "./RadarChart";
+import { submitAnalystDecision, fetchAuditTrail } from "@/lib/api";
 
 const riskBadgeClasses = {
   "high-risk":
@@ -8,6 +9,8 @@ const riskBadgeClasses = {
     "border-amber-500/40 bg-amber-500/15 text-amber-200 shadow shadow-amber-500/30",
   "low-risk":
     "border-emerald-500/40 bg-emerald-500/15 text-emerald-200 shadow shadow-emerald-500/30",
+  "critical":
+    "border-red-600/50 bg-red-600/20 text-red-200 shadow shadow-red-600/40",
 };
 
 const defaultShareForm = {
@@ -24,6 +27,13 @@ export default function CaseDetail({
   const [showRiskWarning, setShowRiskWarning] = useState(false);
   const [pendingShareData, setPendingShareData] = useState(null);
   const [showAdvancedAnalysis, setShowAdvancedAnalysis] = useState(false); // Toggle for low-level signals
+  
+  // Analyst decision state
+  const [analystNotes, setAnalystNotes] = useState("");
+  const [decisionPending, setDecisionPending] = useState(false);
+  const [decisionResult, setDecisionResult] = useState(null);
+  const [auditTrail, setAuditTrail] = useState([]);
+  const [showAuditTrail, setShowAuditTrail] = useState(false);
 
   const metadataEntries = useMemo(() => {
     if (!submission?.metadata) return [];
@@ -81,6 +91,65 @@ export default function CaseDetail({
     });
   }, [graphCommunities]);
 
+  // Build explainability bullet points from available data
+  // NOTE: This must be before the early return to follow React hooks rules
+  const explainabilityPoints = useMemo(() => {
+    if (!caseData) return [];
+    const points = [];
+    const bd = caseData?.breakdown || {};
+    const heur = bd.heuristics || [];
+    
+    // Azure OpenAI reasoning (primary)
+    if (bd.azure_openai_reasoning) {
+      points.push({
+        icon: "🤖",
+        text: bd.azure_openai_reasoning,
+        source: "Azure OpenAI GPT-4"
+      });
+    }
+    
+    // Azure Content Safety flags
+    if (bd.azure_safety_result?.flagged_categories?.length > 0) {
+      const cats = bd.azure_safety_result.flagged_categories.join(", ");
+      points.push({
+        icon: "⚠️",
+        text: `Content Safety detected potential harm: ${cats}`,
+        source: "Azure Content Safety"
+      });
+    }
+    
+    // High AI probability
+    if (typeof bd.ai_probability === "number" && bd.ai_probability > 0.7) {
+      points.push({
+        icon: "🔬",
+        text: `High probability of AI-generated content (${(bd.ai_probability * 100).toFixed(0)}%)`,
+        source: "AI Detection Model"
+      });
+    }
+    
+    // Key heuristics (top 3)
+    heur.slice(0, 3).forEach(h => {
+      if (!h.toLowerCase().includes("azure")) {
+        points.push({
+          icon: "📊",
+          text: h,
+          source: "Heuristic Analysis"
+        });
+      }
+    });
+    
+    // Behavioral risk
+    if (typeof bd.behavioral_score === "number" && bd.behavioral_score > 0.6) {
+      points.push({
+        icon: "🚨",
+        text: `Elevated behavioral risk patterns detected (urgency, coordination signals)`,
+        source: "Behavioral Analysis"
+      });
+    }
+    
+    return points;
+  }, [caseData]);
+
   if (!caseData) {
     return (
       <aside className="rounded-3xl border border-white/5 bg-slate-900/80 p-6 shadow-2xl shadow-black/50 backdrop-blur">
@@ -107,6 +176,47 @@ export default function CaseDetail({
     // High-risk warning and package building removed
   };
   
+  // Analyst decision handlers
+  const handleDecision = async (decision) => {
+    if (!caseData?.intake_id) return;
+    setDecisionPending(true);
+    setDecisionResult(null);
+    try {
+      const result = await submitAnalystDecision(
+        caseData.intake_id,
+        decision,
+        analystNotes,
+        "analyst"
+      );
+      setDecisionResult({ success: true, decision, message: result.message });
+      setAnalystNotes("");
+      // Refresh audit trail
+      loadAuditTrail();
+    } catch (error) {
+      setDecisionResult({ success: false, message: error.message });
+    } finally {
+      setDecisionPending(false);
+    }
+  };
+  
+  const loadAuditTrail = async () => {
+    if (!caseData?.intake_id) return;
+    try {
+      const data = await fetchAuditTrail(caseData.intake_id);
+      setAuditTrail(data.audit_trail || []);
+    } catch (error) {
+      console.error("Failed to load audit trail:", error);
+    }
+  };
+  
+  // Load audit trail when showing it
+  const toggleAuditTrail = () => {
+    if (!showAuditTrail) {
+      loadAuditTrail();
+    }
+    setShowAuditTrail(!showAuditTrail);
+  };
+
   // const handleConfirmHighRiskShare = async () => { ... }
   // const handleCancelHighRiskShare = () => { ... }
 
@@ -166,14 +276,228 @@ export default function CaseDetail({
         </div>
       </section>
 
-      {caseData.decision_reason && (
-        <section className="rounded-2xl border border-emerald-500/10 bg-emerald-500/5 px-5 py-4">
-          <p className="text-xs uppercase tracking-[0.32em] text-emerald-300">Decision rationale</p>
-          <p className="mt-2 text-sm leading-relaxed text-slate-100">
-            {caseData.decision_reason}
-          </p>
+      {caseData.decision_reason && (() => {
+        // Parse the decision reason into user-friendly insights
+        const parseDecisionReason = (reason) => {
+          const insights = [];
+          
+          // Extract AI detection result
+          const aiMatch = reason.match(/AI Detector Verdict: (\S+) \((\d+\.?\d*)%/i);
+          if (aiMatch) {
+            const verdict = aiMatch[1];
+            const confidence = parseFloat(aiMatch[2]);
+            insights.push({
+              icon: verdict.toLowerCase().includes('human') ? '✅' : '🤖',
+              label: 'AI Detection',
+              value: verdict.replace('-', ' '),
+              detail: `${confidence.toFixed(0)}% confidence`,
+              tone: confidence < 50 ? 'good' : 'warn'
+            });
+          }
+          
+          // Extract emotional manipulation
+          const emoMatch = reason.match(/(\d+) urgency terms?, (\d+) valence words?, and (\d+) exclamations?/i);
+          if (emoMatch) {
+            const urgency = parseInt(emoMatch[1]);
+            const valence = parseInt(emoMatch[2]);
+            const exclamations = parseInt(emoMatch[3]);
+            const total = urgency + valence + exclamations;
+            insights.push({
+              icon: total > 3 ? '⚠️' : '📝',
+              label: 'Emotional Signals',
+              value: total > 3 ? 'Elevated' : 'Normal',
+              detail: `${urgency} urgency · ${valence} sentiment · ${exclamations} emphasis`,
+              tone: total > 3 ? 'warn' : 'neutral'
+            });
+          }
+          
+          // Extract coherence
+          if (reason.toLowerCase().includes('narrative coherence')) {
+            const isLow = reason.toLowerCase().includes('low narrative coherence');
+            insights.push({
+              icon: isLow ? '🔀' : '📖',
+              label: 'Narrative Flow',
+              value: isLow ? 'Fragmented' : 'Coherent',
+              detail: isLow ? 'Potential topic drift detected' : 'Consistent messaging',
+              tone: isLow ? 'warn' : 'good'
+            });
+          }
+          
+          // Extract AI likelihood percentage
+          const likelihoodMatch = reason.match(/AI detector flagged a (\d+)% likelihood/i);
+          if (likelihoodMatch) {
+            const likelihood = parseInt(likelihoodMatch[1]);
+            insights.push({
+              icon: likelihood > 50 ? '🔬' : '👤',
+              label: 'AI Probability',
+              value: `${likelihood}%`,
+              detail: likelihood > 70 ? 'High likelihood of AI generation' : likelihood > 40 ? 'Moderate AI indicators' : 'Likely human-written',
+              tone: likelihood > 70 ? 'bad' : likelihood > 40 ? 'warn' : 'good'
+            });
+          }
+          
+          return insights;
+        };
+        
+        const insights = parseDecisionReason(caseData.decision_reason);
+        
+        const toneStyles = {
+          good: { border: 'border-emerald-500/20', bg: 'bg-emerald-500/5', text: 'text-emerald-200' },
+          warn: { border: 'border-amber-500/20', bg: 'bg-amber-500/5', text: 'text-amber-200' },
+          bad: { border: 'border-rose-500/20', bg: 'bg-rose-500/5', text: 'text-rose-200' },
+          neutral: { border: 'border-slate-500/20', bg: 'bg-slate-500/5', text: 'text-slate-200' }
+        };
+        
+        return (
+          <section className="rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 to-slate-900/50 px-5 py-5">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-lg">🧠</span>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-cyan-300">Analysis Summary</h3>
+            </div>
+            
+            {insights.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3">
+                {insights.map((insight, idx) => {
+                  const style = toneStyles[insight.tone] || toneStyles.neutral;
+                  return (
+                    <div 
+                      key={idx} 
+                      className={`rounded-xl ${style.border} ${style.bg} px-4 py-3`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{insight.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-slate-400 uppercase tracking-wide">{insight.label}</p>
+                          <p className={`text-sm font-semibold ${style.text}`}>{insight.value}</p>
+                        </div>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-400">{insight.detail}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400 italic">No specific signals detected</p>
+            )}
+          </section>
+        );
+      })()}
+
+      {/* ==================== WHY WAS THIS FLAGGED? ==================== */}
+      {explainabilityPoints.length > 0 && (
+        <section className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-5 py-5">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-amber-300 flex items-center gap-2">
+            <span>❓</span> Why was this flagged?
+          </h3>
+          <ul className="mt-4 space-y-3">
+            {explainabilityPoints.map((point, idx) => (
+              <li key={idx} className="flex items-start gap-3 text-sm">
+                <span className="text-lg">{point.icon}</span>
+                <div className="flex-1">
+                  <p className="text-slate-200">{point.text}</p>
+                  <p className="text-xs text-slate-500 mt-1">Source: {point.source}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
+
+      {/* ==================== ANALYST DECISION VIEW ==================== */}
+      <section className="rounded-2xl border border-purple-500/20 bg-purple-500/5 px-5 py-5">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-purple-300">
+          Analyst Decision
+        </h3>
+        <p className="mt-1 text-xs text-slate-400">
+          Record your assessment of this case
+        </p>
+        
+        <div className="mt-4 space-y-4">
+          {/* Decision buttons */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => handleDecision("flag")}
+              disabled={decisionPending}
+              className="flex-1 min-w-[80px] px-4 py-2 rounded-lg border border-rose-500/40 bg-rose-500/10 text-rose-200 text-sm font-medium hover:bg-rose-500/20 transition disabled:opacity-50"
+            >
+              🚩 Flag
+            </button>
+            <button
+              onClick={() => handleDecision("monitor")}
+              disabled={decisionPending}
+              className="flex-1 min-w-[80px] px-4 py-2 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-200 text-sm font-medium hover:bg-amber-500/20 transition disabled:opacity-50"
+            >
+              👁️ Monitor
+            </button>
+            <button
+              onClick={() => handleDecision("escalate")}
+              disabled={decisionPending}
+              className="flex-1 min-w-[80px] px-4 py-2 rounded-lg border border-red-600/40 bg-red-600/10 text-red-200 text-sm font-medium hover:bg-red-600/20 transition disabled:opacity-50"
+            >
+              ⬆️ Escalate
+            </button>
+            <button
+              onClick={() => handleDecision("dismiss")}
+              disabled={decisionPending}
+              className="flex-1 min-w-[80px] px-4 py-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-200 text-sm font-medium hover:bg-emerald-500/20 transition disabled:opacity-50"
+            >
+              ✓ Dismiss
+            </button>
+          </div>
+          
+          {/* Analyst notes */}
+          <div>
+            <label className="text-xs uppercase tracking-wide text-slate-400">
+              Notes (optional)
+            </label>
+            <textarea
+              value={analystNotes}
+              onChange={(e) => setAnalystNotes(e.target.value)}
+              placeholder="Add context or reasoning for your decision..."
+              rows={2}
+              className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            />
+          </div>
+          
+          {/* Decision result message */}
+          {decisionResult && (
+            <div className={`rounded-lg px-4 py-2 text-sm ${decisionResult.success ? 'bg-emerald-500/10 text-emerald-200 border border-emerald-500/30' : 'bg-rose-500/10 text-rose-200 border border-rose-500/30'}`}>
+              {decisionResult.message}
+            </div>
+          )}
+        </div>
+        
+        {/* Audit Trail Toggle */}
+        <div className="mt-4 pt-4 border-t border-white/10">
+          <button
+            onClick={toggleAuditTrail}
+            className="text-xs text-purple-300 hover:text-purple-200 transition flex items-center gap-2"
+          >
+            📋 {showAuditTrail ? "Hide" : "View"} Case History & Audit Trail
+          </button>
+          
+          {showAuditTrail && (
+            <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
+              {auditTrail.length === 0 ? (
+                <p className="text-xs text-slate-500">No audit entries yet.</p>
+              ) : (
+                auditTrail.map((entry) => (
+                  <div key={entry.id} className="rounded-lg border border-white/5 bg-slate-900/60 px-3 py-2 text-xs">
+                    <div className="flex justify-between text-slate-400">
+                      <span className="font-medium text-slate-300">{entry.action}</span>
+                      <span>{new Date(entry.created_at).toLocaleString()}</span>
+                    </div>
+                    <p className="mt-1 text-slate-500">
+                      By: {entry.actor}
+                      {entry.payload?.notes && ` — "${entry.payload.notes}"`}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      </section>
 
       <section className="space-y-5">
         <div className="flex items-center justify-between">

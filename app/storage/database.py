@@ -204,3 +204,56 @@ class Database:
                     datetime.utcnow().isoformat(),
                 ),
             )
+
+    def get_audit_trail(self, intake_id: str) -> list[Dict[str, Any]]:
+        """Retrieve immutable audit trail for a case."""
+        with self._cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, action, actor, payload, created_at
+                FROM audit_log
+                WHERE intake_id = ?
+                ORDER BY created_at ASC
+            """,
+                (intake_id,),
+            )
+            rows = cur.fetchall() or []
+            return [
+                {
+                    "id": r[0],
+                    "action": r[1],
+                    "actor": r[2],
+                    "payload": json.loads(r[3]) if r[3] else {},
+                    "created_at": r[4],
+                }
+                for r in rows
+            ]
+
+    def list_cases(self, limit: int = 50) -> list[Dict[str, Any]]:
+        """List recent cases for dashboard."""
+        with self._cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    intake_id,
+                    classification,
+                    composite_score,
+                    summary_text,
+                    created_at
+                FROM cases
+                ORDER BY created_at DESC
+                LIMIT ?
+            """,
+                (limit,),
+            )
+            rows = cur.fetchall() or []
+            return [
+                {
+                    "intake_id": r[0],
+                    "classification": r[1],
+                    "composite_score": r[2],
+                    "summary": r[3],
+                    "created_at": r[4],
+                }
+                for r in rows
+            ]
