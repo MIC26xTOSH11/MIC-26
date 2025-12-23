@@ -21,7 +21,12 @@ torch
 sentencepiece
 peft
 
-# Ollama Python Client
+# Azure AI Services (Microsoft Imagine Cup 2026)
+openai>=1.0.0  # Azure OpenAI SDK
+azure-ai-contentsafety>=1.0.0  # Azure Content Safety SDK
+azure-core>=1.28.0  # Azure core dependencies
+
+# Ollama Python Client (deprecated, keeping for backward compatibility)
 ollama==0.4.2
 
 # Testing

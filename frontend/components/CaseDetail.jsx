@@ -27,6 +27,7 @@ export default function CaseDetail({
   const [formState, setFormState] = useState(defaultShareForm);
   const [showRiskWarning, setShowRiskWarning] = useState(false);
   const [pendingShareData, setPendingShareData] = useState(null);
+  const [showAdvancedAnalysis, setShowAdvancedAnalysis] = useState(false); // Toggle for low-level signals
 
   const metadataEntries = useMemo(() => {
     if (!submission?.metadata) return [];
@@ -200,15 +201,72 @@ export default function CaseDetail({
       )}
 
       <section className="space-y-5">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
-          Signal breakdown
-        </h3>
-        <ScoreBar label="Linguistic confidence" value={breakdown.linguistic_score} color="bg-emerald-400" />
-        <ScoreBar label="Behavioral risk" value={breakdown.behavioral_score} color="bg-amber-400" />
-        <ScoreBar label="AI Detection probability" value={breakdown.ai_probability} color="bg-cyan-400" />
-        {breakdown.ollama_risk !== null && breakdown.ollama_risk !== undefined && (
-          <ScoreBar label="Ollama Semantic Risk" value={breakdown.ollama_risk} color="bg-purple-400" />
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
+            Enterprise Risk Assessment
+          </h3>
+          <button
+            onClick={() => setShowAdvancedAnalysis(!showAdvancedAnalysis)}
+            className="text-xs px-3 py-1 rounded-lg border border-white/10 bg-slate-950/60 text-slate-300 hover:bg-slate-900/80 transition-colors"
+          >
+            {showAdvancedAnalysis ? "Hide" : "Show"} Advanced Analysis
+          </button>
+        </div>
+        
+        {/* Azure OpenAI Risk (Primary Signal - Always Visible) */}
+        {(breakdown.azure_openai_risk !== null && breakdown.azure_openai_risk !== undefined) && (
+          <div className="rounded-xl border border-purple-500/30 bg-purple-500/10 px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs uppercase tracking-wide text-purple-300">Azure OpenAI Analysis</span>
+              <span className="text-sm font-mono font-semibold text-purple-200">
+                {(breakdown.azure_openai_risk * 100).toFixed(1)}%
+              </span>
+            </div>
+            {breakdown.azure_openai_reasoning && (
+              <p className="text-xs text-slate-300 italic">
+                "{breakdown.azure_openai_reasoning}"
+              </p>
+            )}
+          </div>
         )}
+        
+        {/* Azure Content Safety (Primary Signal - Always Visible) */}
+        {(breakdown.azure_safety_score !== null && breakdown.azure_safety_score !== undefined) && (
+          <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs uppercase tracking-wide text-rose-300">Azure Content Safety</span>
+              <span className="text-sm font-mono font-semibold text-rose-200">
+                {(breakdown.azure_safety_score * 100).toFixed(1)}%
+              </span>
+            </div>
+            {breakdown.azure_safety_result?.flagged_categories?.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {breakdown.azure_safety_result.flagged_categories.map(cat => (
+                  <span key={cat} className="text-xs px-2 py-0.5 rounded bg-rose-500/20 text-rose-200">
+                    {cat}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Low-Level Signals (Hidden by default - Microsoft Imagine Cup requirement) */}
+        {showAdvancedAnalysis && (
+          <>
+            <div className="border-t border-white/10 pt-3 mt-3">
+              <p className="text-xs text-slate-400 mb-3 italic">Low-level detection signals (for technical review)</p>
+            </div>
+            <ScoreBar label="Linguistic confidence" value={breakdown.linguistic_score} color="bg-emerald-400" />
+            <ScoreBar label="Behavioral risk" value={breakdown.behavioral_score} color="bg-amber-400" />
+            <ScoreBar label="AI Detection probability" value={breakdown.ai_probability} color="bg-cyan-400" />
+            {breakdown.ollama_risk !== null && breakdown.ollama_risk !== undefined && (
+              <ScoreBar label="Legacy Semantic Risk" value={breakdown.ollama_risk} color="bg-slate-400" />
+            )}
+          </>
+        )}
+        
+        {/* Model Family Detection */}
         {breakdown.model_family && (
           <div className="rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3">
             <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">Model Family Detected</p>
@@ -218,7 +276,7 @@ export default function CaseDetail({
                 {breakdown.model_family_confidence ? `${(breakdown.model_family_confidence * 100).toFixed(1)}%` : '—'}
               </span>
             </div>
-            {breakdown.model_family_probabilities && Object.keys(breakdown.model_family_probabilities).length > 0 && (
+            {showAdvancedAnalysis && breakdown.model_family_probabilities && Object.keys(breakdown.model_family_probabilities).length > 0 && (
               <div className="mt-3 space-y-1">
                 {Object.entries(breakdown.model_family_probabilities).map(([family, prob]) => (
                   <div key={family} className="flex items-center justify-between text-xs">
@@ -232,45 +290,48 @@ export default function CaseDetail({
         )}
       </section>
 
-      <section className="rounded-2xl border border-white/10 bg-slate-950/60 px-5 py-5">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
-          Stylometric analysis
-        </h3>
-        <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
-          {/* Stylometric Anomalies - Left */}
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
-              Anomalies
-            </h4>
-            <ul className="space-y-2 text-sm text-slate-200">
-              {Object.keys(stylometric).length === 0 ? (
-                <li className="text-xs text-slate-500">
-                  No stylometric anomalies detected.
-                </li>
-              ) : (
-                Object.entries(stylometric).map(([key, value]) => (
-                  <li
-                    key={key}
-                    className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-900/50 px-4 py-2"
-                  >
-                    <span className="text-xs uppercase tracking-wide text-slate-400">
-                      {key.replace(/_/g, " ")}
-                    </span>
-                    <span className="font-mono text-sm text-emerald-200">
-                      {typeof value === "number" ? value.toFixed(2) : String(value)}
-                    </span>
+      {/* Stylometric Analysis - Only show in Advanced Mode */}
+      {showAdvancedAnalysis && (
+        <section className="rounded-2xl border border-white/10 bg-slate-950/60 px-5 py-5">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
+            Stylometric analysis
+          </h3>
+          <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
+            {/* Stylometric Anomalies - Left */}
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
+                Anomalies
+              </h4>
+              <ul className="space-y-2 text-sm text-slate-200">
+                {Object.keys(stylometric).length === 0 ? (
+                  <li className="text-xs text-slate-500">
+                    No stylometric anomalies detected.
                   </li>
-                ))
-              )}
-            </ul>
-          </div>
+                ) : (
+                  Object.entries(stylometric).map(([key, value]) => (
+                    <li
+                      key={key}
+                      className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-900/50 px-4 py-2"
+                    >
+                      <span className="text-xs uppercase tracking-wide text-slate-400">
+                        {key.replace(/_/g, " ")}
+                      </span>
+                      <span className="font-mono text-sm text-emerald-200">
+                        {typeof value === "number" ? value.toFixed(2) : String(value)}
+                      </span>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </div>
 
-          {/* Signal Radar - Right */}
-          <div className="flex justify-center items-start">
-            <RadarChart breakdown={breakdown} />
+            {/* Signal Radar - Right */}
+            <div className="flex justify-center items-start">
+              <RadarChart breakdown={breakdown} />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <section>
         <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-300">

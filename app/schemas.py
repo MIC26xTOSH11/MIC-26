@@ -26,7 +26,14 @@ class DetectionBreakdown(BaseModel):
     model_family: Optional[str] = None
     model_family_confidence: Optional[float] = None
     model_family_probabilities: Optional[Dict[str, float]] = None
-    ollama_risk: Optional[float] = None
+    ollama_risk: Optional[float] = None  # Kept for backward compatibility
+    
+    # Azure integration fields (Microsoft Imagine Cup 2026)
+    azure_openai_risk: Optional[float] = None
+    azure_openai_reasoning: Optional[str] = None
+    azure_safety_score: Optional[float] = None
+    azure_safety_result: Optional[Dict[str, Any]] = None
+    
     stylometric_anomalies: Dict[str, float]
     heuristics: List[str]
 

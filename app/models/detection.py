@@ -3,11 +3,12 @@ import math
 import re
 import statistics
 from collections import Counter
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..config import get_settings
 from ..integrations.hf_detector import get_ai_detector
-from ..integrations.ollama_client import OllamaClient
+from ..integrations.azure_openai_client import AzureOpenAIClient
+from ..integrations.azure_content_safety import AzureContentSafetyClient
 from ..schemas import ContentIntake, DetectionBreakdown
 
 logger = logging.getLogger(__name__)
@@ -89,12 +90,19 @@ class DetectorEngine:
 
         self._ai_detector = get_ai_detector()
 
-        # Safely initialize Ollama client so the engine doesn't crash if Ollama isn't running
+        # Initialize Azure OpenAI client (primary semantic scorer)
         try:
-            self._ollama_client = OllamaClient()
+            self._azure_openai_client = AzureOpenAIClient()
         except Exception as e:
-            logger.warning(f"Failed to initialize Ollama client: {e}")
-            self._ollama_client = None
+            logger.warning(f"Failed to initialize Azure OpenAI client: {e}")
+            self._azure_openai_client = None
+        
+        # Initialize Azure Content Safety client (harm detection)
+        try:
+            self._azure_content_safety_client = AzureContentSafetyClient()
+        except Exception as e:
+            logger.warning(f"Failed to initialize Azure Content Safety client: {e}")
+            self._azure_content_safety_client = None
 
     def detect(self, intake: ContentIntake) -> Tuple[float, str, DetectionBreakdown]:
         text = intake.text
@@ -128,24 +136,52 @@ class DetectorEngine:
                     f"Fingerprint matches {model_family} family ({model_family_confidence:.1%} match)."
                 )
 
-        # 4. Semantic Risk (Ollama)
-        ollama_risk = self._ollama_risk_assessment(text)
-        if ollama_risk is not None:
+        # 4. Azure OpenAI Semantic Risk Assessment (Primary Reasoning)
+        azure_openai_result = self._azure_openai_risk_assessment(text, intake.metadata)
+        azure_openai_risk: Optional[float] = None
+        azure_reasoning: Optional[str] = None
+        
+        if azure_openai_result:
+            azure_openai_risk = azure_openai_result.get("risk_score")
+            azure_reasoning = azure_openai_result.get("reasoning")
+            confidence = azure_openai_result.get("confidence", 0.0)
+            
             heuristics.append(
-                f"Ollama semantic analysis: {ollama_risk:.1%} risk "
-                f"(model: {self.settings.ollama_model})."
+                f"Azure OpenAI analysis: {azure_openai_risk:.1%} risk "
+                f"(confidence: {confidence:.1%}, model: {self.settings.azure_openai_deployment_name})."
             )
-
-        # 5. Composite Scoring
+            
+            # Add reasoning as a separate heuristic if available
+            if azure_reasoning:
+                heuristics.append(f"GPT-4 Reasoning: {azure_reasoning}")
+        
+        # 5. Azure Content Safety (Harm Detection)
+        azure_safety_result = self._azure_content_safety_assessment(text)
+        azure_safety_score: Optional[float] = None
+        
+        if azure_safety_result:
+            azure_safety_score = azure_safety_result.get("harm_score")
+            severity = azure_safety_result.get("severity_level")
+            flagged = azure_safety_result.get("flagged_categories", [])
+            
+            heuristics.append(
+                f"Azure Content Safety: {severity} severity, harm score {azure_safety_score:.1%}."
+            )
+            
+            if flagged:
+                heuristics.append(f"Harmful content detected: {', '.join(flagged)}.")
+        
+        # 6. Composite Scoring
         # Sigmoid the linear stylometric score to get 0-1 range
         base_prob = self._sigmoid(stylometric_score)
 
-        # Intelligently blend scores based on what is available
+        # Intelligently blend scores with Azure-first pipeline
         composite = self._blend_scores(
             base_prob=base_prob,
             behavior_score=behavior_score,
             ai_score=ai_score,
-            ollama_risk=ollama_risk,
+            azure_openai_risk=azure_openai_risk,
+            azure_safety_score=azure_safety_score,
         )
 
         classification = self._classify(composite)
@@ -159,7 +195,11 @@ class DetectorEngine:
             model_family_probabilities=(
                 model_family_result.get("all_probabilities") if model_family_result else None
             ),
-            ollama_risk=ollama_risk,
+            ollama_risk=azure_openai_risk,  # Store Azure OpenAI risk in ollama_risk field for compatibility
+            azure_openai_risk=azure_openai_risk,
+            azure_openai_reasoning=azure_reasoning,
+            azure_safety_score=azure_safety_score,
+            azure_safety_result=azure_safety_result,
             stylometric_anomalies={k: round(v, 3) for k, v in features.items()},
             heuristics=heuristics,
         )
@@ -409,25 +449,28 @@ class DetectorEngine:
         base_prob: float,
         behavior_score: float,
         ai_score: Optional[float],
-        ollama_risk: Optional[float] = None,
+        azure_openai_risk: Optional[float] = None,
+        azure_safety_score: Optional[float] = None,
     ) -> float:
         """
-        Weighted ensemble of all signals with HIGH priority to Ollama and HF detections.
+        Azure-first weighted ensemble for Microsoft Imagine Cup 2026.
         
-        Scoring hierarchy:
-        1. Ollama (semantic risk): 40% weight - Deep semantic understanding of content
-        2. HF AI Detection: 35% weight - State-of-the-art AI generation detection
-        3. Behavioral Analysis: 15% weight - Metadata, urgency, manipulation tactics
-        4. Stylometric Base: 10% weight - Linguistic fingerprinting
+        NEW Scoring Pipeline (Enterprise-Grade):
+        1. Azure OpenAI (primary reasoning): 40% weight - GPT-4 semantic understanding
+        2. Azure Content Safety (harm signals): 25% weight - Enterprise harm detection
+        3. HF AI Detection (supporting): 20% weight - AI generation detection
+        4. Behavioral Analysis: 10% weight - Metadata, urgency, manipulation
+        5. Stylometric Base: 5% weight - Linguistic fingerprinting (de-emphasized)
         
-        When both Ollama and HF are available, they dominate (75% combined).
-        When only one is available, it still carries significant weight.
+        Azure services dominate (65% combined) when available.
+        Fusion Engine combines all signals for final enterprise risk score.
         """
         weights = {
-            'stylometric': 0.10,
-            'behavioral': 0.15,
-            'ai_detection': 0.35,
-            'ollama': 0.40,
+            'stylometric': 0.05,        # De-emphasized
+            'behavioral': 0.10,          # Supporting signal
+            'ai_detection': 0.20,        # Supporting signal
+            'azure_openai': 0.40,        # Primary reasoning (HIGHEST)
+            'azure_safety': 0.25,        # Harm detection (HIGH)
         }
         
         # Track which signals are available
@@ -435,7 +478,7 @@ class DetectorEngine:
         composite = 0.0
         total_weight_used = 0.0
         
-        # Add stylometric score (always available)
+        # Add stylometric score (always available, de-emphasized)
         composite += base_prob * weights['stylometric']
         total_weight_used += weights['stylometric']
         available_signals.append('stylometric')
@@ -445,28 +488,34 @@ class DetectorEngine:
         total_weight_used += weights['behavioral']
         available_signals.append('behavioral')
         
-        # Add HF AI detection if available (HIGH PRIORITY)
+        # Add HF AI detection if available (supporting signal)
         if ai_score is not None:
             composite += ai_score * weights['ai_detection']
             total_weight_used += weights['ai_detection']
             available_signals.append('ai_detection')
         
-        # Add Ollama semantic risk if available (HIGHEST PRIORITY)
-        if ollama_risk is not None:
-            composite += ollama_risk * weights['ollama']
-            total_weight_used += weights['ollama']
-            available_signals.append('ollama')
+        # Add Azure OpenAI semantic risk if available (PRIMARY - HIGHEST PRIORITY)
+        if azure_openai_risk is not None:
+            composite += azure_openai_risk * weights['azure_openai']
+            total_weight_used += weights['azure_openai']
+            available_signals.append('azure_openai')
         
-        # If some signals are missing, redistribute their weight proportionally
-        # This ensures we still get 0-1 range even with missing signals
+        # Add Azure Content Safety if available (HARM SIGNALS - HIGH PRIORITY)
+        if azure_safety_score is not None:
+            composite += azure_safety_score * weights['azure_safety']
+            total_weight_used += weights['azure_safety']
+            available_signals.append('azure_safety')
+        
+        # Fusion Engine: Redistribute missing weight proportionally
+        # This ensures robust scoring even with partial signal availability
         if total_weight_used < 1.0:
-            # Redistribute missing weight proportionally among available signals
             redistribution_factor = 1.0 / total_weight_used
             composite *= redistribution_factor
         
         logger.debug(
-            f"Score blending: base={base_prob:.2f}, behavior={behavior_score:.2f}, "
-            f"ai={ai_score or 0:.2f}, ollama={ollama_risk or 0:.2f} -> "
+            f"Azure-first score blending: base={base_prob:.2f}, behavior={behavior_score:.2f}, "
+            f"ai={ai_score or 0:.2f}, azure_openai={azure_openai_risk or 0:.2f}, "
+            f"azure_safety={azure_safety_score or 0:.2f} -> "
             f"composite={composite:.2f} (signals: {', '.join(available_signals)})"
         )
 
@@ -529,15 +578,36 @@ class DetectorEngine:
             return None, None
         return self._ai_detector.analyze_text(text)
 
-    def _ollama_risk_assessment(self, text: str) -> Optional[float]:
+    def _azure_openai_risk_assessment(self, text: str, metadata=None) -> Optional[Dict[str, Any]]:
         """
-        Use Ollama for semantic/contextual risk assessment.
-        Returns risk score 0.0-1.0 if available, None otherwise.
+        Use Azure OpenAI (GPT-4) for semantic/contextual risk assessment.
+        Returns full result dict with risk_score, reasoning, etc.
         """
-        if self._ollama_client is None:
+        if self._azure_openai_client is None:
             return None
         try:
-            return self._ollama_client.risk_assessment(text)
+            # Extract context from metadata if available
+            context = None
+            if metadata:
+                context = {
+                    "platform": getattr(metadata, "platform", None),
+                    "region": getattr(metadata, "region", None),
+                    "source": getattr(metadata, "source", None),
+                }
+            return self._azure_openai_client.risk_assessment(text, context)
         except Exception as e:
-            logger.warning(f"Ollama risk assessment failed: {e}")
+            logger.warning(f"Azure OpenAI risk assessment failed: {e}")
+            return None
+    
+    def _azure_content_safety_assessment(self, text: str) -> Optional[Dict[str, Any]]:
+        """
+        Use Azure Content Safety for harm detection.
+        Returns full result dict with harm scores, flagged categories, etc.
+        """
+        if self._azure_content_safety_client is None:
+            return None
+        try:
+            return self._azure_content_safety_client.analyze_content(text)
+        except Exception as e:
+            logger.warning(f"Azure Content Safety assessment failed: {e}")
             return None

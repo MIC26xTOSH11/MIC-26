@@ -51,7 +51,7 @@ async def startup_event():
     # Database init is already called in Database.__init__, but we verify it here
     # to surface any errors early
     try:
-        database._initialise()
+        database_l1._initialise()
     except Exception as e:
         print(f"Database initialization warning: {e}")
 
