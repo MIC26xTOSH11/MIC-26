@@ -1,22 +1,32 @@
 # TattvaDrishti
 
-**Prototype platform to detect and mitigate malign information operations powered by large language models.**
+
+**Azure-first platform to detect and mitigate malign information operations for Microsoft Imagine Cup 2026.**
 
 Combines advanced AI detection with multi-layered analysis:
-- 🤖 **Ollama Semantic Analysis** (40% weight) - Deep contextual risk assessment using local LLMs
-- 🔍 **Hugging Face AI Detection** (35% weight) - State-of-the-art AI-generated content detection
-- 🎯 **Behavioral Analysis** (15% weight) - Metadata, urgency, and manipulation tactics
-- 📊 **Stylometric Analysis** (10% weight) - Linguistic fingerprinting and patterns
+- 🔵 **Azure OpenAI Semantic Risk** (40% weight) — GPT-4-powered contextual risk assessment with plain-English reasoning
+- 🟣 **Azure Content Safety** (25% weight) — Native detection of manipulative persuasion, harmful intent, and coordinated influence
+- 🔍 **Hugging Face AI Detection** (20% weight) — State-of-the-art AI-generated content detection
+- 🎯 **Behavioral & Stylometric Analysis** (15% weight) — Urgency, manipulation, and linguistic fingerprinting
 
-Plus threat graph intelligence, provenance checks, and federated sharing scaffolding.
+**Key Features:**
+- Text-only content intake with minimal metadata
+- Blended Enterprise Trust Risk Score (0–100, Low/Medium/High/Critical)
+- Human-readable explainability panel (“Why was this flagged?”)
+- Analyst decision view (Flag / Monitor / Escalate + notes)
+- Immutable case history and audit trail
+- Minimal dashboard with content list, risk levels, and detail views
+- Fully Azure-first architecture (no local LLMs required)
+- Judge-proof demo mode with clean Azure AI logs
+
+---
 
 ---
 
 ## ⚠️ Python Version Requirement
 
-**This project requires Python 3.11.x**
 
-Python 3.12+ is **not supported** due to FastAPI + Pydantic v1 compatibility issues. The codebase enforces this requirement at runtime.
+**This project requires Python 3.12+**
 
 ### Install Python 3.11
 
@@ -55,28 +65,13 @@ sudo dnf install -y python3.11 python3.11-venv
 
 ## 🚀 Quick Start
 
-### 1. Install Ollama (Required for Semantic Analysis)
 
-```bash
-# Linux
-curl -fsSL https://ollama.com/install.sh | sh
+### 1. Azure Setup (Required for Semantic Analysis)
 
-# macOS
-brew install ollama
+- **Azure OpenAI**: Provision a GPT-4 deployment and set `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_KEY`, and `AZURE_OPENAI_DEPLOYMENT` in your `.env` file.
+- **Azure Content Safety**: Provision Content Safety resource and set `AZURE_CONTENT_SAFETY_ENDPOINT` and `AZURE_CONTENT_SAFETY_KEY` in `.env`.
 
-# Windows - Download from https://ollama.com/download/windows
-```
-
-Start Ollama and download the model:
-```bash
-# Start Ollama server
-ollama serve
-
-# In another terminal, download the recommended model
-ollama pull llama3.2:3b
-```
-
-📖 **Detailed Ollama setup**: See [docs/OLLAMA_SETUP.md](docs/OLLAMA_SETUP.md)
+No local LLMs or Ollama required for Imagine Cup mode.
 
 ### 2. Backend (FastAPI)
 
@@ -129,7 +124,7 @@ TattvaDrishti/
 │   ├── main.py              # API routes and server
 │   ├── config.py            # Settings and environment config
 │   ├── schemas.py           # Pydantic models
-│   ├── integrations/        # HuggingFace, Ollama clients
+│   ├── integrations/        # Azure OpenAI, Content Safety, HuggingFace clients
 │   ├── models/              # Detection, graph, watermark engines
 │   ├── services/            # Orchestrator
 │   └── storage/             # SQLite database layer
@@ -159,9 +154,13 @@ WATERMARK_SEED=your-secret-seed
 HF_MODEL_NAME=roberta-base-openai-detector
 HF_TOKENIZER_NAME=roberta-base-openai-detector
 HF_DEVICE=-1  # -1 for CPU, 0+ for GPU
-OLLAMA_ENABLED=false
-OLLAMA_MODEL=gpt-oss:20b
+AZURE_OPENAI_ENDPOINT=your-azure-endpoint
+AZURE_OPENAI_KEY=your-azure-key
+AZURE_OPENAI_DEPLOYMENT=your-gpt4-deployment
+AZURE_CONTENT_SAFETY_ENDPOINT=your-content-safety-endpoint
+AZURE_CONTENT_SAFETY_KEY=your-content-safety-key
 ```
+
 
 ### Frontend Environment Variables
 
@@ -188,19 +187,21 @@ pytest
 ## 📦 Dependencies
 
 ### Backend
-- **FastAPI** 0.104.1 - Web framework
-- **Pydantic** 1.10.13 - Data validation (v1 for Python 3.11 compatibility)
-- **Uvicorn** 0.23.2 - ASGI server
-- **NetworkX** 3.1 - Graph intelligence
-- **Transformers** - HuggingFace models
-- **PyTorch** - ML framework
-- **Jinja2** 3.1.2 - Template engine
+- **FastAPI** 0.104.1 — Web framework
+- **Pydantic** 2.x — Data validation
+- **Uvicorn** 0.23.2 — ASGI server
+- **Azure OpenAI SDK** — GPT-4 risk assessment
+- **Azure Content Safety SDK** — Harm detection
+- **Transformers** — HuggingFace models
+- **PyTorch** — ML framework
+- **NetworkX** 3.1 — Graph intelligence
+- **Jinja2** 3.1.2 — Template engine
 
 ### Frontend
-- **Next.js** 14.2.3 - React framework
+- **Next.js** 14.2.3 — React framework
 - **React** 18.2.0
-- **Tailwind CSS** 3.4.4 - Styling
-- **SWR** 2.2.4 - Data fetching
+- **Tailwind CSS** 3.4.4 — Styling
+- **SWR** 2.2.4 — Data fetching
 
 ---
 
@@ -356,20 +357,28 @@ The detector will prompt the model for a JSON risk rating (0-1) and blend it wit
 pytest
 ```
 
+
 ## API Reference
 
-- `POST /api/v1/intake` — analyse content.
-- `GET /api/v1/cases/{intake_id}` — retrieve stored case summary.
-- `POST /api/v1/share` — generate a federated sharing package.
-- `GET /api/v1/events/stream` — Server-Sent Events feed for live updates.
+- `POST /api/v1/intake` — Analyse content (text-only, minimal metadata)
+- `GET /api/v1/cases/{intake_id}` — Retrieve stored case summary
+- `POST /api/v1/cases/{intake_id}/decision` — Analyst decision (Flag/Monitor/Escalate/Dismiss)
+- `GET /api/v1/cases/{intake_id}/audit` — Immutable audit trail for a case
+- `GET /api/v1/cases` — List all cases for dashboard
 
 ## Data & Storage
 
 SQLite database stored at `data/app.db` (configurable via `DATABASE_URL`).
 
-## Extending the MVP
 
-- Swap the Hugging Face model for a proprietary fine-tuned detector.
-- Enrich graph intelligence with live social telemetry.
-- Integrate blockchain-backed sharing receipts.
-- Add automated remediation playbooks triggered by high-risk scores.
+## Imagine Cup 2026 Features
+
+- Azure OpenAI-powered semantic risk analysis (score 0–100 + category + plain-English reasoning)
+- Native Azure AI Content Safety detection (manipulative persuasion, harmful intent, coordinated influence)
+- Single blended Enterprise Trust Risk Score with opinionated thresholds
+- Human-readable explainability panel (“Why was this flagged?”)
+- Analyst decision view (Flag / Monitor / Escalate + notes)
+- Immutable case history and audit trail
+- Minimal dashboard showing analyzed content list, risk levels, and detail views
+- Fully Azure-first architecture
+- Judge-proof demo mode enforcing Azure AI path with clean logs
