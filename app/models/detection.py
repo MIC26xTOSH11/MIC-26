@@ -9,6 +9,7 @@ from ..config import get_settings
 from ..integrations.hf_detector import get_ai_detector
 from ..integrations.azure_openai_client import AzureOpenAIClient
 from ..integrations.azure_content_safety import AzureContentSafetyClient
+from ..integrations.azure_language_client import AzureLanguageClient
 from ..schemas import ContentIntake, DetectionBreakdown
 
 logger = logging.getLogger(__name__)
@@ -103,16 +104,46 @@ class DetectorEngine:
         except Exception as e:
             logger.warning(f"Failed to initialize Azure Content Safety client: {e}")
             self._azure_content_safety_client = None
+        
+        # Initialize Azure Language client (multi-language support)
+        try:
+            self._azure_language_client = AzureLanguageClient()
+        except Exception as e:
+            logger.warning(f"Failed to initialize Azure Language client: {e}")
+            self._azure_language_client = None
 
     def detect(self, intake: ContentIntake) -> Tuple[float, str, DetectionBreakdown]:
         text = intake.text
         features = self._extract_features(text)
+
+        # 0. Multi-Language Detection (Azure Language Service)
+        language_result = self._detect_language(text)
+        detected_language = "en"  # Default fallback
+        language_confidence = 0.0
+        
+        if language_result:
+            detected_language = language_result.get("language_code", "en")
+            language_confidence = language_result.get("confidence", 0.0)
+            lang_name = language_result.get("language_name", "English")
+            is_supported = language_result.get("is_supported", True)
+            
+            if is_supported:
+                logger.info(f"Detected language: {lang_name} ({detected_language}) with {language_confidence:.1%} confidence")
+            else:
+                logger.warning(f"Detected language {lang_name} is not in primary supported list, proceeding with analysis")
 
         # 1. Base Stylometric Score
         stylometric_score = self._score_features(features)
 
         # 2. Heuristics & Behavioral Analysis
         heuristics = self._run_heuristics(intake, features)
+        
+        # Add language detection heuristic
+        if language_result:
+            lang_name = language_result.get("language_name", "Unknown")
+            native_name = language_result.get("native_name", lang_name)
+            heuristics.append(f"Language detected: {lang_name} ({native_name}) - {language_confidence:.1%} confidence.")
+        
         behavior_score = self._calculate_behavioral_risk(intake, features, heuristics)
 
         # 3. AI Detection (Hugging Face / Local Model)
@@ -200,6 +231,9 @@ class DetectorEngine:
             azure_openai_reasoning=azure_reasoning,
             azure_safety_score=azure_safety_score,
             azure_safety_result=azure_safety_result,
+            detected_language=detected_language if language_result else None,
+            detected_language_name=language_result.get("language_name") if language_result else None,
+            language_confidence=language_confidence if language_result else None,
             stylometric_anomalies={k: round(v, 3) for k, v in features.items()},
             heuristics=heuristics,
         )
@@ -610,4 +644,17 @@ class DetectorEngine:
             return self._azure_content_safety_client.analyze_content(text)
         except Exception as e:
             logger.warning(f"Azure Content Safety assessment failed: {e}")
+            return None
+    
+    def _detect_language(self, text: str) -> Optional[Dict[str, Any]]:
+        """
+        Use Azure Language Service to detect the language of the input text.
+        Supports 15+ languages including English, Hindi, Arabic, Spanish, etc.
+        """
+        if self._azure_language_client is None:
+            return None
+        try:
+            return self._azure_language_client.detect_language(text)
+        except Exception as e:
+            logger.warning(f"Language detection failed: {e}")
             return None

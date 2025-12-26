@@ -3,6 +3,24 @@ import { CITIES } from "@/lib/cities";
 
 const minCharacters = 20;
 
+const SUPPORTED_LANGUAGES = [
+  { code: "en", name: "English" },
+  { code: "hi", name: "Hindi" },
+  { code: "ar", name: "Arabic" },
+  { code: "es", name: "Spanish" },
+  { code: "fr", name: "French" },
+  { code: "de", name: "German" },
+  { code: "pt", name: "Portuguese" },
+  { code: "ru", name: "Russian" },
+  { code: "zh", name: "Chinese" },
+  { code: "ja", name: "Japanese" },
+  { code: "ko", name: "Korean" },
+  { code: "ta", name: "Tamil" },
+  { code: "te", name: "Telugu" },
+  { code: "ur", name: "Urdu" },
+  { code: "bn", name: "Bengali" },
+];
+
 export default function IntakeForm({
   onSubmit,
   isSubmitting,
@@ -264,12 +282,18 @@ export default function IntakeForm({
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3 text-sm">
         <InputField label="Language" variant={variant} emphasis={metadataLabelEmphasis}>
-          <input
+          <select
             id="payload-language"
             value={language}
             onChange={(event) => setLanguage(event.target.value)}
             className={inputClass}
-          />
+          >
+            {SUPPORTED_LANGUAGES.map((lang) => (
+              <option key={lang.code} value={lang.code}>
+                {lang.name} ({lang.code})
+              </option>
+            ))}
+          </select>
         </InputField>
         <InputField label="Source channel" variant={variant} emphasis={metadataLabelEmphasis}>
           <input

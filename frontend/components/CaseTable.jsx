@@ -19,6 +19,9 @@ export default function CaseTable({ results, selectedId, onSelect }) {
                 Classification
               </th>
               <th className="px-4 py-3 text-left font-medium">Composite</th>
+              <th className="px-4 py-3 text-left font-medium">Azure</th>
+              <th className="px-4 py-3 text-left font-medium">Safety</th>
+              <th className="px-4 py-3 text-left font-medium">Language</th>
               <th className="px-4 py-3 text-left font-medium">Model Family</th>
               <th className="px-4 py-3 text-left font-medium">Created</th>
             </tr>
@@ -27,7 +30,7 @@ export default function CaseTable({ results, selectedId, onSelect }) {
             {results.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={8}
                   className="px-4 py-6 text-center text-sm text-slate-500"
                 >
                   No intakes analysed yet. Submit a narrative to light up the
@@ -45,7 +48,18 @@ export default function CaseTable({ results, selectedId, onSelect }) {
                       month: "short",
                     })
                   : "—";
-                const family = result?.breakdown?.model_family || "—";
+                const breakdown = result?.breakdown || {};
+                const family = breakdown?.model_family || "—";
+                const azureRisk =
+                  typeof breakdown.azure_openai_risk === "number"
+                    ? `${(breakdown.azure_openai_risk * 100).toFixed(0)}%`
+                    : "—";
+                const safetyRisk =
+                  typeof breakdown.azure_safety_score === "number"
+                    ? `${(breakdown.azure_safety_score * 100).toFixed(0)}%`
+                    : "—";
+                const languageLabel =
+                  breakdown.detected_language_name || breakdown.detected_language || "—";
                 return (
                   <tr
                     key={result.intake_id}
@@ -73,6 +87,15 @@ export default function CaseTable({ results, selectedId, onSelect }) {
                       {typeof result.composite_score === "number"
                         ? result.composite_score.toFixed(2)
                         : "n/a"}
+                    </td>
+                    <td className="px-4 py-3 text-xs font-semibold text-purple-200">
+                      {azureRisk}
+                    </td>
+                    <td className="px-4 py-3 text-xs font-semibold text-rose-200">
+                      {safetyRisk}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-200">
+                      {languageLabel}
                     </td>
                     <td className="px-4 py-3 text-xs text-fuchsia-200">
                       {family}

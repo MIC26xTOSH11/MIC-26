@@ -239,7 +239,9 @@ class Database:
                     classification,
                     composite_score,
                     summary_text,
-                    created_at
+                    created_at,
+                    metadata_json,
+                    breakdown_json
                 FROM cases
                 ORDER BY created_at DESC
                 LIMIT ?
@@ -248,12 +250,26 @@ class Database:
             )
             rows = cur.fetchall() or []
             return [
-                {
+                (lambda metadata, breakdown: {
                     "intake_id": r[0],
                     "classification": r[1],
                     "composite_score": r[2],
                     "summary": r[3],
+                    # Expose created_at under both created_at and submitted_at
+                    # so it matches the DetectionResult-like shape used by the frontend.
                     "created_at": r[4],
-                }
+                    "submitted_at": r[4],
+                    # Include parsed JSON blobs so the frontend can render Azure + language signals
+                    # without having to hydrate every row via /cases/{id}.
+                    "metadata": metadata,
+                    "breakdown": breakdown,
+                    # Convenience top-level fields used by frontend filters/search.
+                    "platform": (metadata or {}).get("platform"),
+                    "region": (metadata or {}).get("region"),
+                    "actor_id": (metadata or {}).get("actor_id"),
+                })(
+                    json.loads(r[5]) if r[5] else {},
+                    json.loads(r[6]) if r[6] else {},
+                )
                 for r in rows
             ]

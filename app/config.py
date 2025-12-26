@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     azure_content_safety_key: str = Field("", env="AZURE_CONTENT_SAFETY_KEY")
     azure_content_safety_enabled: bool = Field(True, env="AZURE_CONTENT_SAFETY_ENABLED")
     
+    # Azure AI Language Configuration (Multi-language Support)
+    # Supports: English, Hindi, Arabic, Spanish, French, German, Portuguese,
+    # Russian, Chinese, Japanese, Korean, Tamil, Telugu, Urdu, Bengali
+    azure_language_endpoint: str = Field("", env="AZURE_LANGUAGE_ENDPOINT")
+    azure_language_key: str = Field("", env="AZURE_LANGUAGE_KEY")
+    azure_language_enabled: bool = Field(True, env="AZURE_LANGUAGE_ENABLED")
+    
     # Blockchain, sharing, and image analysis features removed - focusing on text disinformation MVP
     # federated_encryption_key, federated_nodes, node_url removed
     # sightengine_api_user, sightengine_api_secret removed

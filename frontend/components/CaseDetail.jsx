@@ -549,6 +549,24 @@ export default function CaseDetail({
             )}
           </div>
         )}
+
+        {/* Azure Language (Primary Signal - Always Visible when available) */}
+        {(breakdown.detected_language || breakdown.detected_language_name) && (
+          <div className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs uppercase tracking-wide text-sky-300">Detected Language</span>
+              <span className="text-sm font-mono font-semibold text-sky-200">
+                {breakdown.detected_language_name || breakdown.detected_language}
+                {breakdown.detected_language ? ` (${breakdown.detected_language})` : ""}
+              </span>
+            </div>
+            {typeof breakdown.language_confidence === "number" && (
+              <p className="mt-1 text-xs text-slate-300">
+                Confidence: {(breakdown.language_confidence * 100).toFixed(0)}%
+              </p>
+            )}
+          </div>
+        )}
         
         {/* Low-Level Signals (Hidden by default - Microsoft Imagine Cup requirement) */}
         {showAdvancedAnalysis && (

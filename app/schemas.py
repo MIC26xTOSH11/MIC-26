@@ -34,6 +34,13 @@ class DetectionBreakdown(BaseModel):
     azure_safety_score: Optional[float] = None
     azure_safety_result: Optional[Dict[str, Any]] = None
     
+    # Azure Language Service (Multi-language support)
+    # Supports: English, Hindi, Arabic, Spanish, French, German, Portuguese,
+    # Russian, Chinese, Japanese, Korean, Tamil, Telugu, Urdu, Bengali
+    detected_language: Optional[str] = None  # ISO 639-1 code (e.g., 'en', 'hi')
+    detected_language_name: Optional[str] = None  # Full name (e.g., 'English', 'Hindi')
+    language_confidence: Optional[float] = None  # Detection confidence 0.0-1.0
+    
     stylometric_anomalies: Dict[str, float]
     heuristics: List[str]
 

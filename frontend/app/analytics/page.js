@@ -139,6 +139,25 @@ export default function AnalyticsPage() {
       .slice(0, 10)
       .map(([name, value]) => ({ name, value }));
 
+    // Azure signal averages (when breakdown is available)
+    const azureOpenAiScores = [];
+    const azureSafetyScores = [];
+    filtered.forEach((r) => {
+      const bd = r?.breakdown;
+      if (!bd) return;
+      if (typeof bd.azure_openai_risk === "number") azureOpenAiScores.push(bd.azure_openai_risk);
+      if (typeof bd.azure_safety_score === "number") azureSafetyScores.push(bd.azure_safety_score);
+    });
+
+    const avgAzureOpenAiRisk =
+      azureOpenAiScores.length > 0
+        ? azureOpenAiScores.reduce((sum, v) => sum + v, 0) / azureOpenAiScores.length
+        : null;
+    const avgAzureSafety =
+      azureSafetyScores.length > 0
+        ? azureSafetyScores.reduce((sum, v) => sum + v, 0) / azureSafetyScores.length
+        : null;
+
     return {
       total: filtered.length,
       classifications: Object.entries(classifications).map(([name, value]) => ({ name, value })),
@@ -147,6 +166,8 @@ export default function AnalyticsPage() {
       scoreDistribution: Object.entries(scoreRanges).map(([name, value]) => ({ name, value })),
       topRegions,
       avgScore: filtered.reduce((sum, r) => sum + (r.composite_score || 0), 0) / (filtered.length || 1),
+      avgAzureOpenAiRisk,
+      avgAzureSafety,
     };
   }, [results, timeRange]);
 
@@ -187,7 +208,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Key Metrics */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
           <p className="text-sm text-slate-400">Total Analyzed</p>
           <p className="mt-1 text-3xl font-bold text-white">{analytics.total}</p>
@@ -196,6 +217,22 @@ export default function AnalyticsPage() {
           <p className="text-sm text-slate-400">Avg Threat Score</p>
           <p className="mt-1 text-3xl font-bold text-emerald-400">
             {(analytics.avgScore * 100).toFixed(1)}%
+          </p>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
+          <p className="text-sm text-slate-400">Avg Azure OpenAI</p>
+          <p className="mt-1 text-3xl font-bold text-purple-300">
+            {typeof analytics.avgAzureOpenAiRisk === "number"
+              ? `${(analytics.avgAzureOpenAiRisk * 100).toFixed(1)}%`
+              : "—"}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
+          <p className="text-sm text-slate-400">Avg Content Safety</p>
+          <p className="mt-1 text-3xl font-bold text-rose-300">
+            {typeof analytics.avgAzureSafety === "number"
+              ? `${(analytics.avgAzureSafety * 100).toFixed(1)}%`
+              : "—"}
           </p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
@@ -250,18 +287,22 @@ export default function AnalyticsPage() {
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={analytics.classifications}
+                data={analytics.classifications.filter((c) => c.value > 0)}
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                label={({ name, value, percent }) =>
+                  value > 0 ? `${name}: ${(percent * 100).toFixed(0)}%` : ""
+                }
                 outerRadius={100}
                 fill="#8884d8"
                 dataKey="value"
               >
-                {analytics.classifications.map((entry) => (
-                  <Cell key={entry.name} fill={COLORS[entry.name] || "#94a3b8"} />
-                ))}
+                {analytics.classifications
+                  .filter((c) => c.value > 0)
+                  .map((entry) => (
+                    <Cell key={entry.name} fill={COLORS[entry.name] || "#94a3b8"} />
+                  ))}
               </Pie>
               <Tooltip
                 contentStyle={{

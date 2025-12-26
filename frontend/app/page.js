@@ -419,6 +419,14 @@ export default function HomePage() {
                 {/* Metadata */}
                 <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-6">
                   <h3 className="mb-4 text-lg font-semibold text-white">Analysis Details</h3>
+                  {(() => {
+                    const breakdown = results[0]?.breakdown || {};
+                    const detectedName = breakdown.detected_language_name;
+                    const detectedCode = breakdown.detected_language;
+                    const detectedConfidence = breakdown.language_confidence;
+
+                    return (
+                      <>
                   <div className="space-y-3">
                     <div className="flex items-start justify-between border-b border-white/5 pb-3">
                       <span className="text-sm text-slate-500">Intake ID</span>
@@ -452,49 +460,130 @@ export default function HomePage() {
                         <span className="text-sm text-slate-300">{results[0].region}</span>
                       </div>
                     )}
-                    {results[0].language && (
+                    {(detectedName || detectedCode) && (
                       <div className="flex items-start justify-between border-b border-white/5 pb-3">
-                        <span className="text-sm text-slate-500">Language</span>
-                        <span className="text-sm text-slate-300">{results[0].language}</span>
+                        <span className="text-sm text-slate-500">Detected language</span>
+                        <span className="text-sm text-slate-300">
+                          {detectedName || detectedCode}
+                          {detectedCode ? ` (${detectedCode})` : ""}
+                          {typeof detectedConfidence === "number"
+                            ? ` • ${(detectedConfidence * 100).toFixed(0)}%`
+                            : ""}
+                        </span>
                       </div>
                     )}
-                    {results[0].model_family && (
+                    {breakdown?.model_family && (
                       <div className="flex items-start justify-between">
                         <span className="text-sm text-slate-500">Model Family</span>
-                        <span className="text-sm text-slate-300">{results[0].model_family}</span>
+                        <span className="text-sm text-slate-300">
+                          {breakdown.model_family}
+                          {typeof breakdown.model_family_confidence === "number"
+                            ? ` • ${(breakdown.model_family_confidence * 100).toFixed(0)}%`
+                            : ""}
+                        </span>
                       </div>
                     )}
                   </div>
+
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {/* Detection Scores */}
-                {(results[0].detection_scores || results[0].azure_scores) && (
+                {(() => {
+                  const breakdown = results[0]?.breakdown || null;
+                  if (!breakdown) return null;
+
+                  const rows = [
+                    {
+                      label: "Azure OpenAI semantic risk",
+                      value:
+                        typeof breakdown.azure_openai_risk === "number"
+                          ? `${(breakdown.azure_openai_risk * 100).toFixed(1)}%`
+                          : null,
+                    },
+                    {
+                      label: "Azure Content Safety",
+                      value:
+                        typeof breakdown.azure_safety_score === "number"
+                          ? `${(breakdown.azure_safety_score * 100).toFixed(1)}%`
+                          : null,
+                    },
+                    {
+                      label: "AI-generated probability",
+                      value:
+                        typeof breakdown.ai_probability === "number"
+                          ? `${(breakdown.ai_probability * 100).toFixed(1)}%`
+                          : null,
+                    },
+                    {
+                      label: "Behavioral risk",
+                      value:
+                        typeof breakdown.behavioral_score === "number"
+                          ? `${(breakdown.behavioral_score * 100).toFixed(1)}%`
+                          : null,
+                    },
+                    {
+                      label: "Linguistic signal",
+                      value:
+                        typeof breakdown.linguistic_score === "number"
+                          ? `${(breakdown.linguistic_score * 100).toFixed(1)}%`
+                          : null,
+                    },
+                  ].filter((row) => row.value !== null);
+
+                  const flagged = Array.isArray(breakdown.azure_safety_result?.flagged_categories)
+                    ? breakdown.azure_safety_result.flagged_categories
+                    : [];
+
+                  if (rows.length === 0 && flagged.length === 0 && !breakdown.azure_openai_reasoning) {
+                    return null;
+                  }
+
+                  return (
                   <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-6">
                     <h3 className="mb-4 text-lg font-semibold text-white">Detection Scores</h3>
                     <div className="space-y-3">
-                      {results[0].detection_scores && Object.entries(results[0].detection_scores).map(([key, value]) => (
-                        <div key={key} className="flex items-center justify-between">
-                          <span className="text-sm capitalize text-slate-400">
-                            {key.replace(/_/g, " ")}
-                          </span>
-                          <span className="text-sm font-medium text-white">
-                            {typeof value === "number" ? (value * 100).toFixed(1) + "%" : value}
-                          </span>
+                      {rows.map((row) => (
+                        <div key={row.label} className="flex items-center justify-between">
+                          <span className="text-sm text-slate-400">{row.label}</span>
+                          <span className="text-sm font-medium text-white">{row.value}</span>
                         </div>
                       ))}
-                      {results[0].azure_scores && Object.entries(results[0].azure_scores).map(([key, value]) => (
-                        <div key={key} className="flex items-center justify-between">
-                          <span className="text-sm capitalize text-slate-400">
-                            Azure {key.replace(/_/g, " ")}
-                          </span>
-                          <span className="text-sm font-medium text-white">
-                            {typeof value === "number" ? value.toFixed(2) : value}
-                          </span>
+
+                      {breakdown.azure_openai_reasoning && (
+                        <div className="rounded-xl border border-white/10 bg-slate-900/40 p-3">
+                          <p className="text-xs uppercase tracking-wider text-slate-500">
+                            Azure OpenAI rationale
+                          </p>
+                          <p className="mt-2 text-sm text-slate-300">
+                            {breakdown.azure_openai_reasoning}
+                          </p>
                         </div>
-                      ))}
+                      )}
+
+                      {flagged.length > 0 && (
+                        <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3">
+                          <p className="text-xs uppercase tracking-wider text-rose-300">
+                            Content Safety flags
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {flagged.map((cat) => (
+                              <span
+                                key={cat}
+                                className="rounded bg-rose-500/20 px-2 py-0.5 text-xs text-rose-200"
+                              >
+                                {cat}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* Action Buttons */}
                 <div className="flex gap-3">
