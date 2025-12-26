@@ -6,6 +6,24 @@ import RegionAutocompleteInput from "@/components/RegionAutocompleteInput";
 import { submitIntake } from "@/lib/api";
 import Toast from "@/components/Toast";
 
+const SUPPORTED_LANGUAGES = [
+  { code: "en", name: "English" },
+  { code: "hi", name: "Hindi" },
+  { code: "ar", name: "Arabic" },
+  { code: "es", name: "Spanish" },
+  { code: "fr", name: "French" },
+  { code: "de", name: "German" },
+  { code: "pt", name: "Portuguese" },
+  { code: "ru", name: "Russian" },
+  { code: "zh", name: "Chinese" },
+  { code: "ja", name: "Japanese" },
+  { code: "ko", name: "Korean" },
+  { code: "ta", name: "Tamil" },
+  { code: "te", name: "Telugu" },
+  { code: "ur", name: "Urdu" },
+  { code: "bn", name: "Bengali" },
+];
+
 export default function UploadPage() {
   const [results, setResults] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -15,7 +33,14 @@ export default function UploadPage() {
   const handleFilesAccepted = async (fileContents) => {
     // Queue files for analysis instead of analyzing immediately
     setPendingFiles((prev) => [
-      ...fileContents.map((file) => ({ ...file, region: "" })),
+      ...fileContents.map((file) => {
+        const meta = extractMetadata(file.content, file.name);
+        return {
+          ...file,
+          region: "",
+          language: meta.language || "en",
+        };
+      }),
       ...prev,
     ]);
     setToast({
@@ -30,6 +55,12 @@ export default function UploadPage() {
     );
   };
 
+  const updateFileLanguage = (index, language) => {
+    setPendingFiles((prev) =>
+      prev.map((file, i) => (i === index ? { ...file, language } : file))
+    );
+  };
+
   const handleAnalyze = async () => {
     if (!pendingFiles.length) return;
 
@@ -41,7 +72,7 @@ export default function UploadPage() {
         const metadata = extractMetadata(file.content, file.name);
 
         const text = (metadata.text || file.content || "").slice(0, 5000);
-        const language = metadata.language || "en";
+        const language = file.language || metadata.language || "en";
         const source = metadata.source || file.name || "upload";
         const platform = metadata.platform || "email";
         const region = (file.region || metadata.region || "").trim();
@@ -231,6 +262,19 @@ export default function UploadPage() {
                       </p>
                     </div>
                     <div className="mt-2 flex items-center gap-2 md:mt-0">
+                      <label className="text-[11px] text-slate-400">Language:</label>
+                      <select
+                        value={file.language || "en"}
+                        onChange={(e) => updateFileLanguage(index, e.target.value)}
+                        className="rounded-lg border border-white/10 bg-slate-950/60 px-2 py-1 text-[11px] text-slate-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/60"
+                      >
+                        {SUPPORTED_LANGUAGES.map((l) => (
+                          <option key={l.code} value={l.code}>
+                            {l.name}
+                          </option>
+                        ))}
+                      </select>
+
                       <label className="text-[11px] text-slate-400">Region:</label>
                       <div className="w-48">
                         <RegionAutocompleteInput
@@ -344,6 +388,15 @@ export default function UploadPage() {
                             <span className="text-xs text-slate-500">Score:</span>
                             <span className="text-xs font-medium text-slate-300">
                               {(result.composite_score * 100).toFixed(1)}%
+                            </span>
+                          </div>
+                        )}
+
+                        {(result?.breakdown?.detected_language_name || result?.breakdown?.detected_language) && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-500">Language:</span>
+                            <span className="text-xs font-medium text-slate-300">
+                              {result.breakdown.detected_language_name || result.breakdown.detected_language}
                             </span>
                           </div>
                         )}

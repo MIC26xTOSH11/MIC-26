@@ -18,6 +18,21 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+function bucketizeClassification(value) {
+  const label = (value || "").toLowerCase();
+  if (!label) return "unknown";
+
+  if (label.includes("malicious")) return "malicious";
+  if (label.includes("suspicious")) return "suspicious";
+  if (label.includes("benign")) return "benign";
+
+  if (label.includes("critical") || label.includes("high")) return "malicious";
+  if (label.includes("medium") || label.includes("moderate")) return "suspicious";
+  if (label.includes("low")) return "benign";
+
+  return "unknown";
+}
+
 export default function AnalyticsPage() {
   const [results, setResults] = useState([]);
   const [timeRange, setTimeRange] = useState("7d"); // 24h, 7d, 30d, all
@@ -80,11 +95,8 @@ export default function AnalyticsPage() {
     };
 
     filtered.forEach((r) => {
-      const cls = (r.classification || "unknown").toLowerCase();
-      if (cls.includes("malicious")) classifications.malicious++;
-      else if (cls.includes("suspicious")) classifications.suspicious++;
-      else if (cls.includes("benign")) classifications.benign++;
-      else classifications.unknown++;
+      const bucket = bucketizeClassification(r.classification);
+      classifications[bucket] = (classifications[bucket] || 0) + 1;
     });
 
     // Platform breakdown
@@ -100,12 +112,13 @@ export default function AnalyticsPage() {
       if (!r.submitted_at) return;
       const date = new Date(r.submitted_at).toISOString().split("T")[0];
       if (!dailyData[date]) {
-        dailyData[date] = { date, malicious: 0, suspicious: 0, benign: 0, total: 0 };
+        dailyData[date] = { date, malicious: 0, suspicious: 0, benign: 0, unknown: 0, total: 0 };
       }
-      const cls = (r.classification || "").toLowerCase();
-      if (cls.includes("malicious")) dailyData[date].malicious++;
-      else if (cls.includes("suspicious")) dailyData[date].suspicious++;
-      else if (cls.includes("benign")) dailyData[date].benign++;
+      const bucket = bucketizeClassification(r.classification);
+      if (bucket === "malicious") dailyData[date].malicious++;
+      else if (bucket === "suspicious") dailyData[date].suspicious++;
+      else if (bucket === "benign") dailyData[date].benign++;
+      else dailyData[date].unknown++;
       dailyData[date].total++;
     });
 
@@ -277,6 +290,7 @@ export default function AnalyticsPage() {
               <Line type="monotone" dataKey="malicious" stroke="#f87171" strokeWidth={2} />
               <Line type="monotone" dataKey="suspicious" stroke="#fbbf24" strokeWidth={2} />
               <Line type="monotone" dataKey="benign" stroke="#4ade80" strokeWidth={2} />
+              <Line type="monotone" dataKey="unknown" stroke="#94a3b8" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         </div>

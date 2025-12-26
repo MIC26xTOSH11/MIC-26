@@ -36,12 +36,18 @@ class AnalysisOrchestrator:
         summary_text = self._generate_summary(intake, classification, composite_score, breakdown)
         decision_reason = self._build_decision_reason(classification, composite_score, breakdown)
 
+        stored_metadata = (intake.dict().get("metadata", {}) or {}).copy()
+        # Persist intake-level fields so the frontend can render them reliably.
+        stored_metadata.setdefault("language", intake.language)
+        stored_metadata.setdefault("source", intake.source)
+        stored_metadata.setdefault("tags", intake.tags)
+
         self.db.save_case(
             intake_id=intake_id,
             raw_text=intake.text,
             classification=classification,
             composite_score=composite_score,
-            metadata=intake.dict().get("metadata", {}) or {},
+            metadata=stored_metadata,
             breakdown=breakdown.dict(),
             provenance=provenance.dict(),
             summary=summary_text,

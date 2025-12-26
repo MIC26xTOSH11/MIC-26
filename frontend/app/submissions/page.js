@@ -6,6 +6,23 @@ import CaseDetail from "@/components/CaseDetail";
 import Toast from "@/components/Toast";
 import { fetchCase, listCases, createEventStream } from "@/lib/api";
 
+function bucketizeClassification(value) {
+  const label = (value || "").toLowerCase();
+  if (!label) return "unknown";
+
+  // Direct labels
+  if (label.includes("malicious")) return "malicious";
+  if (label.includes("suspicious")) return "suspicious";
+  if (label.includes("benign")) return "benign";
+
+  // Risk-style labels
+  if (label.includes("critical") || label.includes("high")) return "malicious";
+  if (label.includes("medium") || label.includes("moderate")) return "suspicious";
+  if (label.includes("low")) return "benign";
+
+  return "unknown";
+}
+
 export default function SubmissionsPage() {
   const [results, setResults] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
@@ -90,8 +107,8 @@ export default function SubmissionsPage() {
   const filteredResults = results.filter((r) => {
     // Apply classification filter
     if (filter !== "all") {
-      const classification = (r.classification || "").toLowerCase();
-      if (!classification.includes(filter)) return false;
+      const bucket = bucketizeClassification(r.classification);
+      if (bucket !== filter) return false;
     }
 
     // Apply search filter
@@ -111,9 +128,9 @@ export default function SubmissionsPage() {
 
   const stats = {
     total: results.length,
-    malicious: results.filter((r) => (r.classification || "").toLowerCase().includes("malicious")).length,
-    suspicious: results.filter((r) => (r.classification || "").toLowerCase().includes("suspicious")).length,
-    benign: results.filter((r) => (r.classification || "").toLowerCase().includes("benign")).length,
+    malicious: results.filter((r) => bucketizeClassification(r.classification) === "malicious").length,
+    suspicious: results.filter((r) => bucketizeClassification(r.classification) === "suspicious").length,
+    benign: results.filter((r) => bucketizeClassification(r.classification) === "benign").length,
   };
 
   return (

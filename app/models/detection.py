@@ -118,13 +118,33 @@ class DetectorEngine:
 
         # 0. Multi-Language Detection (Azure Language Service)
         language_result = self._detect_language(text)
-        detected_language = "en"  # Default fallback
+        language_code_to_name = {
+            "en": "English",
+            "hi": "Hindi",
+            "ar": "Arabic",
+            "es": "Spanish",
+            "fr": "French",
+            "de": "German",
+            "pt": "Portuguese",
+            "ru": "Russian",
+            "zh": "Chinese",
+            "ja": "Japanese",
+            "ko": "Korean",
+            "ta": "Tamil",
+            "te": "Telugu",
+            "ur": "Urdu",
+            "bn": "Bengali",
+        }
+
+        detected_language = (getattr(intake, "language", None) or "en").strip().lower()
         language_confidence = 0.0
+        detected_language_name = language_code_to_name.get(detected_language)
         
         if language_result:
-            detected_language = language_result.get("language_code", "en")
+            detected_language = (language_result.get("language_code", detected_language) or detected_language).strip().lower()
             language_confidence = language_result.get("confidence", 0.0)
-            lang_name = language_result.get("language_name", "English")
+            lang_name = language_result.get("language_name") or language_code_to_name.get(detected_language) or "Unknown"
+            detected_language_name = lang_name
             is_supported = language_result.get("is_supported", True)
             
             if is_supported:
@@ -138,11 +158,15 @@ class DetectorEngine:
         # 2. Heuristics & Behavioral Analysis
         heuristics = self._run_heuristics(intake, features)
         
-        # Add language detection heuristic
+        # Add language heuristic (detected or provided)
         if language_result:
             lang_name = language_result.get("language_name", "Unknown")
             native_name = language_result.get("native_name", lang_name)
             heuristics.append(f"Language detected: {lang_name} ({native_name}) - {language_confidence:.1%} confidence.")
+        elif detected_language:
+            heuristics.append(
+                f"Language provided: {detected_language_name or detected_language} ({detected_language})."
+            )
         
         behavior_score = self._calculate_behavioral_risk(intake, features, heuristics)
 
@@ -231,8 +255,8 @@ class DetectorEngine:
             azure_openai_reasoning=azure_reasoning,
             azure_safety_score=azure_safety_score,
             azure_safety_result=azure_safety_result,
-            detected_language=detected_language if language_result else None,
-            detected_language_name=language_result.get("language_name") if language_result else None,
+            detected_language=detected_language,
+            detected_language_name=detected_language_name,
             language_confidence=language_confidence if language_result else None,
             stylometric_anomalies={k: round(v, 3) for k, v in features.items()},
             heuristics=heuristics,

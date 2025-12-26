@@ -267,6 +267,9 @@ class Database:
                     "platform": (metadata or {}).get("platform"),
                     "region": (metadata or {}).get("region"),
                     "actor_id": (metadata or {}).get("actor_id"),
+                    "language": (metadata or {}).get("language"),
+                    "source": (metadata or {}).get("source"),
+                    "tags": (metadata or {}).get("tags"),
                 })(
                     json.loads(r[5]) if r[5] else {},
                     json.loads(r[6]) if r[6] else {},

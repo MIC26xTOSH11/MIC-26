@@ -1,4 +1,16 @@
 export default function CaseTable({ results, selectedId, onSelect }) {
+  const bucketizeClassification = (value) => {
+    const label = (value || "").toLowerCase();
+    if (!label) return "unknown";
+    if (label.includes("malicious")) return "malicious";
+    if (label.includes("suspicious")) return "suspicious";
+    if (label.includes("benign")) return "benign";
+    if (label.includes("critical") || label.includes("high")) return "malicious";
+    if (label.includes("medium") || label.includes("moderate")) return "suspicious";
+    if (label.includes("low")) return "benign";
+    return "unknown";
+  };
+
   return (
     <section className="rounded-3xl border border-white/5 bg-slate-900/70 p-6 shadow-2xl shadow-black/40 backdrop-blur">
       <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -77,7 +89,7 @@ export default function CaseTable({ results, selectedId, onSelect }) {
                     <td className="px-4 py-3 text-xs">
                       <span
                         className={`badge badge-${
-                          (result.classification || "event").toLowerCase()
+                          bucketizeClassification(result.classification)
                         }`}
                       >
                         {result.classification || "Unknown"}
