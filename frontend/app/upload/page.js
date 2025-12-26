@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import DragDropZone from "@/components/DragDropZone";
+import RegionAutocompleteInput from "@/components/RegionAutocompleteInput";
 import { submitIntake } from "@/lib/api";
 import Toast from "@/components/Toast";
 
@@ -9,25 +10,80 @@ export default function UploadPage() {
   const [results, setResults] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState({ message: "", tone: "success" });
+  const [pendingFiles, setPendingFiles] = useState([]);
 
   const handleFilesAccepted = async (fileContents) => {
+    // Queue files for analysis instead of analyzing immediately
+    setPendingFiles((prev) => [
+      ...fileContents.map((file) => ({ ...file, region: "" })),
+      ...prev,
+    ]);
+    setToast({
+      message: `${fileContents.length} file${fileContents.length > 1 ? "s" : ""} ready for analysis. Please select a region and click Start Analyze.`,
+      tone: "success",
+    });
+  };
+
+  const updateFileRegion = (index, region) => {
+    setPendingFiles((prev) =>
+      prev.map((file, i) => (i === index ? { ...file, region } : file))
+    );
+  };
+
+  const handleAnalyze = async () => {
+    if (!pendingFiles.length) return;
+
     setIsProcessing(true);
     const newResults = [];
 
     try {
-      for (const file of fileContents) {
-        // Extract metadata from file content
+      for (const [index, file] of pendingFiles.entries()) {
         const metadata = extractMetadata(file.content, file.name);
-        
-        // Submit to analysis API
+
+        const text = (metadata.text || file.content || "").slice(0, 5000);
+        const language = metadata.language || "en";
+        const source = metadata.source || file.name || "upload";
+        const platform = metadata.platform || "email";
+        const region = (file.region || metadata.region || "").trim();
+        const actorId = metadata.actorId || "";
+
+        if (!text || text.trim().length < 20) {
+          newResults.push({
+            fileName: file.name,
+            status: "error",
+            error: "Content too short for analysis (minimum 20 characters).",
+          });
+          continue;
+        }
+
+        if (!region) {
+          newResults.push({
+            fileName: file.name,
+            status: "error",
+            error: "Please select a region (city/district) before analyzing.",
+          });
+          continue;
+        }
+
+        const tagsArray = typeof metadata.tags === "string"
+          ? metadata.tags
+              .split(",")
+              .map((t) => t.trim())
+              .filter(Boolean)
+          : Array.isArray(metadata.tags)
+          ? metadata.tags
+          : undefined;
+
         const payload = {
-          text: metadata.text || file.content.slice(0, 5000), // Limit to 5000 chars
-          language: metadata.language || "en",
-          source: metadata.source || file.name,
-          platform: metadata.platform || "email",
-          region: metadata.region || "",
-          actor_id: metadata.actorId || "",
-          tags: metadata.tags || "",
+          text,
+          language,
+          source,
+          metadata: {
+            platform,
+            region,
+            actor_id: actorId || undefined,
+          },
+          ...(tagsArray && { tags: tagsArray }),
         };
 
         try {
@@ -37,7 +93,7 @@ export default function UploadPage() {
             fileName: file.name,
             status: "success",
           });
-          
+
           setToast({
             message: `✓ ${file.name} analyzed successfully`,
             tone: "success",
@@ -46,9 +102,9 @@ export default function UploadPage() {
           newResults.push({
             fileName: file.name,
             status: "error",
-            error: error.message,
+            error: error?.response?.data?.detail || error.message || "Failed to analyze file.",
           });
-          
+
           setToast({
             message: `✗ Failed to analyze ${file.name}`,
             tone: "error",
@@ -59,6 +115,8 @@ export default function UploadPage() {
       setResults((prev) => [...newResults, ...prev]);
     } finally {
       setIsProcessing(false);
+      // Clear queue after attempting analysis
+      setPendingFiles([]);
     }
   };
 
@@ -145,6 +203,49 @@ export default function UploadPage() {
             title="Drop Your Files Here"
             description="Supports emails (.eml), text files (.txt), HTML, and JSON social posts"
           />
+
+          {/* Region selection & analyze controls */}
+          {pendingFiles.length > 0 && (
+            <div className="space-y-4 rounded-2xl border border-white/10 bg-slate-900/50 p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-white">Pending Files</h3>
+                <button
+                  onClick={handleAnalyze}
+                  disabled={isProcessing}
+                  className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-xs font-medium text-white shadow-lg shadow-emerald-500/20 transition-all hover:shadow-2xl hover:shadow-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isProcessing ? "Analyzing..." : "Start Analyze"}
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {pendingFiles.map((file, index) => (
+                  <div
+                    key={`${file.name}-${index}`}
+                    className="flex flex-col gap-2 rounded-xl border border-white/10 bg-slate-900/70 p-3 text-xs text-slate-300 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div className="flex-1">
+                      <p className="font-medium text-white">{file.name}</p>
+                      <p className="text-[11px] text-slate-500">
+                        {(file.size / 1024).toFixed(2)} KB • Set region to enable analysis
+                      </p>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 md:mt-0">
+                      <label className="text-[11px] text-slate-400">Region:</label>
+                      <div className="w-48">
+                        <RegionAutocompleteInput
+                          value={file.region || ""}
+                          onChange={(val) => updateFileRegion(index, val)}
+                          placeholder="Start typing city name..."
+                          inputClassName="w-full rounded-lg border border-white/10 bg-slate-950/60 px-2 py-1 text-[11px] text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/60"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Instructions */}
           <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-6">
