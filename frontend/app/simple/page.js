@@ -463,21 +463,7 @@ function CaseOverview({ caseData, submission }) {
 }
 
 function ImageAnalyzerCard() {
-  return (
-    <section className="rounded-[32px] bg-white p-6 shadow-2xl shadow-slate-200/80 ring-1 ring-slate-100">
-      <header className="border-b border-slate-100 pb-4">
-        <h2 className="mt-1 text-2xl font-semibold text-slate-900">
-          Check supporting images
-        </h2>
-        <p className="text-sm text-slate-500">
-          Drop media to detect synthetic artefacts or manipulated propaganda.
-        </p>
-      </header>
-      <div className="mt-4 rounded-[28px] bg-slate-50 p-2 sm:p-4">
-        <ImageAnalyzer variant="light" />
-      </div>
-    </section>
-  );
+  return null;
 }
 
 function getRiskLevel(classification, score) {
