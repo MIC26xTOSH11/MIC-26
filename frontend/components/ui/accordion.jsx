@@ -22,19 +22,23 @@ const Accordion = React.forwardRef(({ type, collapsible, value, onValueChange, c
 Accordion.displayName = "Accordion";
 
 const AccordionItem = React.forwardRef(({ value, className, children, ...props }, ref) => {
+  // Inject the item value into all children so triggers and content
+  // don't need to rely on fragile DOM traversal.
+  const enhancedChildren = React.Children.map(children, (child) => {
+    if (!React.isValidElement(child)) return child;
+    return React.cloneElement(child, { itemValue: value });
+  });
+
   return (
     <div ref={ref} className={className} data-value={value} {...props}>
-      {children}
+      {enhancedChildren}
     </div>
   );
 });
 AccordionItem.displayName = "AccordionItem";
 
-const AccordionTrigger = React.forwardRef(({ className, children, ...props }, ref) => {
+const AccordionTrigger = React.forwardRef(({ className, children, itemValue, ...props }, ref) => {
   const context = React.useContext(AccordionContext);
-  const itemElement = ref?.current?.closest("[data-value]");
-  const itemValue = itemElement?.getAttribute("data-value");
-  
   const triggerRef = React.useRef(null);
   const combinedRef = ref || triggerRef;
 
@@ -83,10 +87,8 @@ AccordionTrigger.displayName = "AccordionTrigger";
 const AccordionContent = React.forwardRef(({ className, children, ...props }, ref) => {
   const context = React.useContext(AccordionContext);
   const contentRef = React.useRef(null);
+  const { itemValue } = props;
   const combinedRef = ref || contentRef;
-  
-  const itemElement = combinedRef.current?.closest("[data-value]");
-  const itemValue = itemElement?.getAttribute("data-value");
 
   const isOpen = React.useMemo(() => {
     if (!itemValue) return false;

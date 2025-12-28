@@ -530,13 +530,13 @@ export default function LandingPage() {
               className="bg-slate-900/50 backdrop-blur-sm border border-white/10 rounded-xl px-6"
             >
               <AccordionTrigger className="hover:no-underline text-white">
-                What is the composite score and how is it calculated?
+                What does TattvaDrishti Shield actually do?
               </AccordionTrigger>
               <AccordionContent className="text-slate-400">
-                The composite score (0-10) aggregates multiple dimensions including emotional manipulation, false
-                authority, coordinated amplification, and other manipulation tactics. Each dimension is weighted based
-                on severity and confidence. The score comes with an explainable breakdown showing which signals were
-                detected.
+                TattvaDrishti Shield analyzes narrative content to surface signs of malign influence: emotionally
+                manipulative framing, coordinated messaging patterns, suspicious sources, and indicators of synthetic
+                or AI-assisted generation. It turns unstructured text into structured signals, scores the overall
+                risk, and gives you an explainable breakdown you can act on.
               </AccordionContent>
             </AccordionItem>
 
@@ -544,11 +544,14 @@ export default function LandingPage() {
               value="item-2"
               className="bg-slate-900/50 backdrop-blur-sm border border-white/10 rounded-xl px-6"
             >
-              <AccordionTrigger className="hover:no-underline text-white">What content formats are supported?</AccordionTrigger>
+              <AccordionTrigger className="hover:no-underline text-white">
+                How is the composite risk score calculated?
+              </AccordionTrigger>
               <AccordionContent className="text-slate-400">
-                We support plain text, HTML, social media posts (Twitter/X, Facebook, Reddit), email (EML/MSG), PDFs,
-                and structured JSON. Image analysis (OCR + visual manipulation detection) is available in Team and
-                Enterprise tiers. Contact us for custom format support.
+                The composite score (0–10) combines several dimensions our pipeline computes: narrative manipulation
+                patterns, coordination signals, harmful content categories, model confidence, and other heuristics.
+                Each dimension contributes a weighted sub-score, and we surface the factors driving the final number
+                so analysts can see <span className="font-semibold text-slate-200">why</span> something was flagged.
               </AccordionContent>
             </AccordionItem>
 
@@ -556,11 +559,14 @@ export default function LandingPage() {
               value="item-3"
               className="bg-slate-900/50 backdrop-blur-sm border border-white/10 rounded-xl px-6"
             >
-              <AccordionTrigger className="hover:no-underline text-white">How fast is the analysis?</AccordionTrigger>
+              <AccordionTrigger className="hover:no-underline text-white">
+                What content types and languages are supported?
+              </AccordionTrigger>
               <AccordionContent className="text-slate-400">
-                Most analyses complete in 2-5 seconds for text content under 10,000 characters. Batch processing and
-                larger documents may take longer. Real-time streaming integrations provide results as content arrives
-                with minimal latency.
+                The current deployment focuses on text: copy-pasted narratives, social media posts, article excerpts,
+                and structured JSON payloads sent via the API. Language support is driven by the underlying Azure
+                Language and OpenAI models and includes English, Hindi, Arabic, Spanish, French, German, Portuguese,
+                Russian, Chinese, Japanese, Korean, Tamil, Telugu, Urdu, and Bengali.
               </AccordionContent>
             </AccordionItem>
 
@@ -568,11 +574,14 @@ export default function LandingPage() {
               value="item-4"
               className="bg-slate-900/50 backdrop-blur-sm border border-white/10 rounded-xl px-6"
             >
-              <AccordionTrigger className="hover:no-underline text-white">What are your data retention policies?</AccordionTrigger>
+              <AccordionTrigger className="hover:no-underline text-white">
+                Where is my data stored and who can see it?
+              </AccordionTrigger>
               <AccordionContent className="text-slate-400">
-                Retention varies by tier: Starter (7 days), Team (90 days), Enterprise (custom). You can configure
-                automatic deletion policies and export data anytime. We follow data minimization principles and never
-                use customer content to train public models without explicit permission.
+                In this reference deployment, submissions and analysis results are stored in the local database that
+                backs the dashboard. Content is only sent to the Azure services you configure (OpenAI, Content Safety,
+                Language) for scoring and detection. Data is not used to train public models, and you can clear the
+                submissions table at any time from your own environment.
               </AccordionContent>
             </AccordionItem>
 
@@ -580,11 +589,14 @@ export default function LandingPage() {
               value="item-5"
               className="bg-slate-900/50 backdrop-blur-sm border border-white/10 rounded-xl px-6"
             >
-              <AccordionTrigger className="hover:no-underline text-white">Do you integrate with other tools?</AccordionTrigger>
+              <AccordionTrigger className="hover:no-underline text-white">
+                How do I integrate this into my workflow?
+              </AccordionTrigger>
               <AccordionContent className="text-slate-400">
-                Yes! We offer REST APIs, webhooks, and pre-built integrations with SIEM platforms, ticketing systems
-                (Jira, ServiceNow), and communication tools (Slack, Teams). Enterprise customers can request custom
-                integrations or use our SDK.
+                You can start directly from the dashboard by pasting narratives into the intake form or uploading
+                content for batch analysis. For automation, the same pipeline is exposed through a FastAPI backend,
+                so other systems can submit JSON payloads and retrieve scores programmatically. This makes it easy to
+                plug TattvaDrishti Shield into existing monitoring, review, or investigation workflows.
               </AccordionContent>
             </AccordionItem>
 
