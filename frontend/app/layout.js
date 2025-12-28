@@ -1,6 +1,5 @@
 import "./globals.css";
 import { Inter, Space_Grotesk } from "next/font/google";
-import Sidebar from "@/components/Sidebar";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -24,10 +23,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
       <body className="bg-slate-950">
-        <Sidebar />
-        <main className="md:pl-64 transition-all duration-300">
-          {children}
-        </main>
+        {children}
       </body>
     </html>
   );
