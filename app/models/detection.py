@@ -6,7 +6,6 @@ from collections import Counter
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..config import get_settings
-from ..integrations.hf_detector import get_ai_detector
 from ..integrations.azure_openai_client import AzureOpenAIClient
 from ..integrations.azure_content_safety import AzureContentSafetyClient
 from ..integrations.azure_language_client import AzureLanguageClient
@@ -89,8 +88,6 @@ class DetectorEngine:
         }
         self.bias = -0.25  # Slightly less negative bias for balance
 
-        self._ai_detector = get_ai_detector()
-
         # Initialize Azure OpenAI client (primary semantic scorer)
         try:
             self._azure_openai_client = AzureOpenAIClient()
@@ -170,26 +167,10 @@ class DetectorEngine:
         
         behavior_score = self._calculate_behavioral_risk(intake, features, heuristics)
 
-        # 3. AI Detection (Hugging Face / Local Model)
-        ai_result, model_family_result = self._ai_detection(text)
+        # 3. AI Detection - Disabled (now using Azure-only pipeline)
         ai_score: Optional[float] = None
         model_family: Optional[str] = None
         model_family_confidence: Optional[float] = None
-
-        if ai_result:
-            # Normalize confidence to probability
-            ai_score = ai_result.get("ai_probability")
-            is_ai = ai_result.get("is_ai", False)
-            verdict = "AI-generated" if is_ai else "Human-written"
-
-            heuristics.append(f"AI Detector Verdict: {verdict} ({ai_score:.1%} confidence).")
-
-            if model_family_result:
-                model_family = model_family_result.get("family")
-                model_family_confidence = model_family_result.get("confidence")
-                heuristics.append(
-                    f"Fingerprint matches {model_family} family ({model_family_confidence:.1%} match)."
-                )
 
         # 4. Azure OpenAI Semantic Risk Assessment (Primary Reasoning)
         azure_openai_result = self._azure_openai_risk_assessment(text, intake.metadata)
@@ -247,9 +228,7 @@ class DetectorEngine:
             ai_probability=ai_score,
             model_family=model_family,
             model_family_confidence=model_family_confidence,
-            model_family_probabilities=(
-                model_family_result.get("all_probabilities") if model_family_result else None
-            ),
+            model_family_probabilities=None,
             ollama_risk=azure_openai_risk,  # Store Azure OpenAI risk in ollama_risk field for compatibility
             azure_openai_risk=azure_openai_risk,
             azure_openai_reasoning=azure_reasoning,
@@ -630,11 +609,6 @@ class DetectorEngine:
         if score >= 0.35:
             return "medium-risk"
         return "low-risk"
-
-    def _ai_detection(self, text: str) -> Tuple[Optional[Dict], Optional[Dict]]:
-        if not getattr(self._ai_detector, "available", False):
-            return None, None
-        return self._ai_detector.analyze_text(text)
 
     def _azure_openai_risk_assessment(self, text: str, metadata=None) -> Optional[Dict[str, Any]]:
         """

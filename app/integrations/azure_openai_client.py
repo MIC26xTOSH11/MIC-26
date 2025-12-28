@@ -1,6 +1,6 @@
 """
 Azure OpenAI client for semantic risk assessment and reasoning.
-Replaces Ollama as the primary semantic scorer for Microsoft Imagine Cup 2026.
+Primary semantic scorer for Microsoft Imagine Cup 2026.
 """
 from __future__ import annotations
 

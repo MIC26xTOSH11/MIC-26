@@ -100,7 +100,6 @@ async def submit_content(
     logger.info("✅ ANALYSIS COMPLETE")
     logger.info(f"   └─ Azure OpenAI Score: {breakdown.azure_openai_risk or 'N/A'} (40% weight)")
     logger.info(f"   └─ Azure Content Safety: {breakdown.azure_safety_score or 'N/A'} (25% weight)")
-    logger.info(f"   └─ HuggingFace AI Detection: {breakdown.ai_probability or 'N/A'}")
     logger.info(f"   └─ Behavioral Score: {breakdown.behavioral_score or 'N/A'}")
     logger.info(f"📊 Enterprise Trust Risk Score: {result.composite_score}")
     logger.info(f"🏷️ Classification: {result.classification}")

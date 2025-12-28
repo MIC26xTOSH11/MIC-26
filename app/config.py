@@ -21,19 +21,6 @@ class Settings(BaseSettings):
         default_factory=lambda: ["USA", "EU", "IN", "AUS"]
     )
     watermark_secret: str = Field("default-watermark-seed", env="WATERMARK_SEED")
-    # Hugging Face AI Detection
-    hf_model_name: str = Field("disabled", env="HF_MODEL_NAME")
-    hf_tokenizer_name: str = Field("disabled", env="HF_TOKENIZER_NAME")
-    hf_device: int = Field(-1, env="HF_DEVICE")  # -1 CPU, >=0 GPU id
-    hf_score_threshold: float = Field(0.6, env="HF_SCORE_THRESHOLD")
-    
-    # Ollama Configuration (DEPRECATED - keeping for backward compatibility)
-    ollama_model: str = Field("llama3.2:3b", env="OLLAMA_MODEL")  # Lightweight and efficient
-    ollama_enabled: bool = Field(False, env="OLLAMA_ENABLED")  # Disabled by default (using Azure OpenAI)
-    ollama_host: str = Field("http://localhost:11434", env="OLLAMA_HOST")
-    ollama_timeout: int = Field(30, env="OLLAMA_TIMEOUT")
-    ollama_prompt_chars: int = Field(2000, env="OLLAMA_PROMPT_CHARS")
-    ollama_timeout_ceiling: int = Field(90, env="OLLAMA_TIMEOUT_CEILING")
     
     # Azure OpenAI Configuration (Primary Semantic Scorer - Microsoft Imagine Cup 2026)
     azure_openai_endpoint: str = Field("", env="AZURE_OPENAI_ENDPOINT")
