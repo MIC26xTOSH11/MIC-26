@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -370,8 +371,13 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             {/* Omar */}
             <Card className="p-6 bg-slate-900/50 backdrop-blur-sm border-white/10 hover:border-emerald-400/50 transition-all duration-300 group">
-              <div className="aspect-square rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 mb-4 overflow-hidden flex items-center justify-center">
-                <Shield className="w-16 h-16 text-white opacity-50" />
+              <div className="aspect-square rounded-xl mb-4 overflow-hidden relative">
+                <Image
+                  src="/images/team/Omar.jpeg"
+                  alt="Omar"
+                  fill
+                  className="object-cover"
+                />
               </div>
               <h3 className="text-xl font-semibold mb-1 text-white">Omar</h3>
               <p className="text-sm text-slate-400">Team Lead</p>
@@ -379,8 +385,13 @@ export default function LandingPage() {
 
             {/* Tanishq */}
             <Card className="p-6 bg-slate-900/50 backdrop-blur-sm border-white/10 hover:border-emerald-400/50 transition-all duration-300 group">
-              <div className="aspect-square rounded-xl bg-gradient-to-br from-cyan-500 to-emerald-500 mb-4 overflow-hidden flex items-center justify-center">
-                <Shield className="w-16 h-16 text-white opacity-50" />
+              <div className="aspect-square rounded-xl mb-4 overflow-hidden relative">
+                <Image
+                  src="/images/team/Tanishq.jpeg"
+                  alt="Tanishq"
+                  fill
+                  className="object-cover"
+                />
               </div>
               <h3 className="text-xl font-semibold mb-1 text-white">Tanishq</h3>
               <p className="text-sm text-slate-400">Team Member</p>
@@ -388,8 +399,13 @@ export default function LandingPage() {
 
             {/* Hansika */}
             <Card className="p-6 bg-slate-900/50 backdrop-blur-sm border-white/10 hover:border-emerald-400/50 transition-all duration-300 group">
-              <div className="aspect-square rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 mb-4 overflow-hidden flex items-center justify-center">
-                <Shield className="w-16 h-16 text-white opacity-50" />
+              <div className="aspect-square rounded-xl mb-4 overflow-hidden relative">
+                <Image
+                  src="/images/team/Hansika.jpeg"
+                  alt="Hansika"
+                  fill
+                  className="object-cover"
+                />
               </div>
               <h3 className="text-xl font-semibold mb-1 text-white">Hansika</h3>
               <p className="text-sm text-slate-400">Team Member</p>
@@ -397,8 +413,13 @@ export default function LandingPage() {
 
             {/* Anirudha */}
             <Card className="p-6 bg-slate-900/50 backdrop-blur-sm border-white/10 hover:border-emerald-400/50 transition-all duration-300 group">
-              <div className="aspect-square rounded-xl bg-gradient-to-br from-cyan-500 to-emerald-500 mb-4 overflow-hidden flex items-center justify-center">
-                <Shield className="w-16 h-16 text-white opacity-50" />
+              <div className="aspect-square rounded-xl mb-4 overflow-hidden relative">
+                <Image
+                  src="/images/team/Anirudha.jpeg"
+                  alt="Anirudha"
+                  fill
+                  className="object-cover"
+                />
               </div>
               <h3 className="text-xl font-semibold mb-1 text-white">Anirudha</h3>
               <p className="text-sm text-slate-400">Team Member</p>
