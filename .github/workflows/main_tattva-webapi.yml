@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "app/**"
+      - "requirements.txt"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 jobs:
