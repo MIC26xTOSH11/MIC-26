@@ -4,8 +4,7 @@ from datetime import datetime
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import StreamingResponse
 
 from .config import Settings, get_settings
 from .schemas import (
@@ -30,7 +29,6 @@ logger = logging.getLogger("TattvaDrishti")
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
-template_engine = Jinja2Templates(directory="templates")
 orchestrator = AnalysisOrchestrator()
 database_l1 = Database()  # Write-enabled connection
 database_l2 = Database()  # Read-only connection (simulated)
@@ -62,9 +60,9 @@ def get_app_settings() -> Settings:
     return settings
 
 
-@app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request):
-    return template_engine.TemplateResponse("dashboard.html", {"request": request})
+@app.get("/")
+def root():
+    return {"status": "TattvaDrishti API is live"}
 
 
 @app.post("/api/v1/intake", response_model=DetectionResult)
