@@ -4,6 +4,7 @@ uvicorn==0.23.2
 pydantic==2.12.5
 pydantic-settings==2.12.0
 httpx
+gunicorn==21.2.0
 
 # Application Dependencies
 networkx==3.1
