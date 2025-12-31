@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { API_BASE_URL } from './api';
 
 const AuthContext = createContext({
   user: null,
@@ -35,7 +36,7 @@ export function AuthProvider({ children }) {
 
   const verifyToken = async (token, username, role) => {
     try {
-      const response = await fetch('http://localhost:8000/api/v1/auth/me', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -62,7 +63,7 @@ export function AuthProvider({ children }) {
   };
 
   const login = async (username, password) => {
-    const response = await fetch('http://localhost:8000/api/v1/auth/login', {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -78,7 +79,7 @@ export function AuthProvider({ children }) {
     const data = await response.json();
 
     // Fetch user permissions
-    const meResponse = await fetch('http://localhost:8000/api/v1/auth/me', {
+    const meResponse = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
       headers: {
         'Authorization': `Bearer ${data.access_token}`,
       },

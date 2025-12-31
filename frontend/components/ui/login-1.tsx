@@ -4,6 +4,7 @@ import * as React from 'react'
 import { useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation';
+import { API_BASE_URL } from '@/lib/api';
 
 interface InputProps {
   label?: string;
@@ -101,7 +102,7 @@ const LoginComponent = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

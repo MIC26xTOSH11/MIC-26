@@ -1,13 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { DESTINATION_NODE_URLS } from "@/lib/api";
 
-const NODE_URLS = {
-  USA: "http://localhost:8001",
-  EU: "http://localhost:8002",
-  IN: "http://localhost:8003",
-  AUS: "http://localhost:8004",
-};
+const NODE_URLS = DESTINATION_NODE_URLS;
 
 export default function FederatedBlockchain() {
   const [chain, setChain] = useState([]);

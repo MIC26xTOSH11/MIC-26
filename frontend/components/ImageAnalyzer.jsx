@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { API_BASE_URL } from "@/lib/api";
 
 export default function ImageAnalyzer({ variant = "dark" }) {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -67,7 +68,7 @@ export default function ImageAnalyzer({ variant = "dark" }) {
     formData.append("models", enabledModels.join(","));
 
     try {
-      const response = await fetch("http://localhost:8000/api/v1/image/analyze", {
+      const response = await fetch(`${API_BASE_URL}/api/v1/image/analyze`, {
         method: "POST",
         body: formData,
       });
