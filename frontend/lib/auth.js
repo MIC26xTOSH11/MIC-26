@@ -107,7 +107,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('username');
     localStorage.removeItem('role');
     setUser(null);
-    window.location.href = 'http://localhost:3000/';
+    window.location.href = '/';
   };
 
   const hasPermission = (permission) => {
