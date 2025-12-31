@@ -30,6 +30,10 @@ class AnalysisOrchestrator:
         submitted_at = datetime.utcnow()
 
         composite_score, classification, breakdown = self.detector.detect(intake)
+        
+        # Enhance breakdown with enterprise analytics fields
+        breakdown = self._enhance_breakdown_with_analytics(breakdown, classification, composite_score)
+        
         provenance = self.watermark.verify(intake.text)
         graph_summary = self.graph.ingest(intake_id, intake, classification, composite_score)
 
@@ -149,6 +153,133 @@ class AnalysisOrchestrator:
             f"{classification.title()} classification for a narrative originating from {region} "
             f"on {platform}. Composite risk scored {score_pct}.{ai_clause} {heuristics_sentence}"
         )
+
+    def _enhance_breakdown_with_analytics(self, breakdown, classification: str, composite_score: float):
+        """Enhance breakdown with enterprise analytics fields."""
+        # Determine consumer vulnerability risk based on content analysis
+        consumer_risk = self._assess_consumer_vulnerability(breakdown, composite_score)
+        
+        # Generate recommended actions based on classification and score
+        recommended_actions = self._generate_recommended_actions(classification, composite_score, breakdown)
+        
+        # Generate flagged reason if malicious or suspicious
+        flagged_reason = self._generate_flagged_reason(classification, composite_score, breakdown)
+        
+        # Update breakdown with new fields
+        breakdown.consumer_vulnerability_risk = consumer_risk
+        breakdown.recommended_actions = recommended_actions
+        breakdown.flagged_reason = flagged_reason
+        
+        return breakdown
+    
+    def _assess_consumer_vulnerability(self, breakdown, composite_score: float) -> str:
+        """Assess which consumer groups are most vulnerable to this content."""
+        # Check for youth-targeting indicators
+        heuristics = breakdown.heuristics or []
+        heuristics_str = " ".join(heuristics).lower()
+        
+        # Check Azure safety categories for specific targeting
+        azure_safety = breakdown.azure_safety_result or {}
+        flagged_categories = azure_safety.get("flagged_categories", [])
+        flagged_str = " ".join(flagged_categories).lower()
+        
+        # Youth indicators
+        youth_indicators = ["youth", "children", "kids", "teens", "students", "young"]
+        if any(indicator in heuristics_str or indicator in flagged_str for indicator in youth_indicators):
+            return "youth"
+        
+        # Elderly/vulnerable indicators
+        vulnerable_indicators = ["elderly", "senior", "vulnerable", "medical", "health"]
+        if any(indicator in heuristics_str or indicator in flagged_str for indicator in vulnerable_indicators):
+            return "vulnerable"
+        
+        # High-risk content affects general population
+        if composite_score >= 0.7:
+            return "general"
+        
+        # Default to general population
+        return "general"
+    
+    def _generate_recommended_actions(self, classification: str, composite_score: float, breakdown) -> list[str]:
+        """Generate recommended actions based on threat level."""
+        actions = []
+        
+        # Determine severity
+        is_malicious = "malicious" in classification.lower()
+        is_suspicious = "suspicious" in classification.lower()
+        is_high_score = composite_score >= 0.7
+        
+        # Azure safety flags
+        azure_safety = breakdown.azure_safety_result or {}
+        flagged_categories = azure_safety.get("flagged_categories", [])
+        
+        if is_malicious or is_high_score:
+            actions.append("Block content immediately")
+            actions.append("Escalate to security team")
+            actions.append("Log for compliance audit")
+            if flagged_categories:
+                actions.append("Report to platform moderators")
+        elif is_suspicious or composite_score >= 0.4:
+            actions.append("Send for human review")
+            actions.append("Monitor for escalation")
+            actions.append("Log for compliance audit")
+            actions.append("Apply content warning label")
+        else:
+            actions.append("Log for analytics")
+            actions.append("Monitor for patterns")
+        
+        return actions
+    
+    def _generate_flagged_reason(self, classification: str, composite_score: float, breakdown) -> str:
+        """Generate explanation for why content was flagged."""
+        is_malicious = "malicious" in classification.lower()
+        is_suspicious = "suspicious" in classification.lower()
+        
+        if not (is_malicious or is_suspicious):
+            return None
+        
+        reasons = []
+        
+        # High composite score
+        if composite_score >= 0.7:
+            reasons.append(f"High threat score of {round(composite_score * 100)}%")
+        elif composite_score >= 0.4:
+            reasons.append(f"Elevated threat score of {round(composite_score * 100)}%")
+        
+        # Azure OpenAI risk
+        if breakdown.azure_openai_risk and breakdown.azure_openai_risk >= 0.5:
+            reasons.append(f"Azure AI semantic analysis detected {round(breakdown.azure_openai_risk * 100)}% risk")
+            if breakdown.azure_openai_reasoning:
+                reasons.append(f"Rationale: {breakdown.azure_openai_reasoning}")
+        
+        # Azure Content Safety flags
+        azure_safety = breakdown.azure_safety_result or {}
+        flagged_categories = azure_safety.get("flagged_categories", [])
+        if flagged_categories:
+            categories_str = ", ".join(flagged_categories)
+            reasons.append(f"Content safety violations: {categories_str}")
+        
+        # AI-generated detection
+        if breakdown.ai_probability and breakdown.ai_probability >= 0.6:
+            reasons.append(f"Likely AI-generated content ({round(breakdown.ai_probability * 100)}% confidence)")
+            if breakdown.model_family:
+                reasons.append(f"Detected model family: {breakdown.model_family}")
+        
+        # Heuristics
+        heuristics = breakdown.heuristics or []
+        if heuristics:
+            top_heuristics = heuristics[:3]
+            reasons.append(f"Triggered detection heuristics: {', '.join(top_heuristics)}")
+        
+        # Behavioral patterns
+        if breakdown.behavioral_score and breakdown.behavioral_score >= 0.6:
+            reasons.append("Suspicious behavioral patterns detected (urgent language, coordination indicators)")
+        
+        if not reasons:
+            reasons.append("Multiple risk factors combined to exceed safety thresholds")
+        
+        return " • ".join(reasons)
+
 
     def _build_decision_reason(
         self,

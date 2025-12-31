@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CITIES } from "@/lib/cities";
+import { getUserLocation } from "@/lib/api";
 
 const minCharacters = 20;
 
@@ -27,6 +28,7 @@ export default function IntakeForm({
   onValidationError,
   variant = "dark",
   metadataLabelStyle = "normal",
+  userRole = "enterprise",
 }) {
   const [text, setText] = useState("");
   const [language, setLanguage] = useState("en");
@@ -37,6 +39,8 @@ export default function IntakeForm({
   const [tags, setTags] = useState("");
   const [showRegionSuggestions, setShowRegionSuggestions] = useState(false);
   const [filteredCities, setFilteredCities] = useState([]);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [locationDetected, setLocationDetected] = useState(false);
   const recognitionRef = useRef(null);
   const regionInputRef = useRef(null);
   const [isListening, setIsListening] = useState(false);
@@ -70,6 +74,29 @@ export default function IntakeForm({
     : "border-emerald-400/40 bg-emerald-500/10 text-emerald-200";
   const statusTextClass = isLight ? "text-xs text-slate-500" : "text-xs text-slate-400";
   const metadataLabelEmphasis = metadataLabelStyle === "bold" ? "bold" : "normal";
+
+  // Auto-detect location on component mount and when region is cleared
+  useEffect(() => {
+    const detectLocation = async () => {
+      // Only auto-detect if region is empty and we're not already detecting
+      if (region || isDetectingLocation) return;
+      
+      setIsDetectingLocation(true);
+      try {
+        const locationData = await getUserLocation();
+        if (locationData?.detected && locationData?.location?.region) {
+          setRegion(locationData.location.region);
+          setLocationDetected(true);
+        }
+      } catch (error) {
+        console.error("Location detection failed:", error);
+      } finally {
+        setIsDetectingLocation(false);
+      }
+    };
+
+    detectLocation();
+  }, [region]); // Re-run only when region changes (not isDetectingLocation to avoid infinite loop)
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -221,6 +248,7 @@ export default function IntakeForm({
       setActorId("");
       setTags("");
       setSpeechError("");
+      setLocationDetected(false); // Reset detection flag so it can auto-detect again
     }
   };
 
@@ -295,44 +323,53 @@ export default function IntakeForm({
             ))}
           </select>
         </InputField>
-        <InputField label="Source channel" variant={variant} emphasis={metadataLabelEmphasis}>
-          <input
-            id="payload-source"
-            value={source}
-            placeholder="e.g. darknet, social-feed"
-            onChange={(event) => setSource(event.target.value)}
-            className={inputClass}
-          />
-        </InputField>
-        <InputField label="Analyst tags" variant={variant} emphasis={metadataLabelEmphasis}>
-          <input
-            id="payload-tags"
-            value={tags}
-            placeholder="disinfo, amplification"
-            onChange={(event) => setTags(event.target.value)}
-            className={inputClass}
-          />
-        </InputField>
+        {userRole === 'enterprise' && (
+          <>
+            <InputField label="Source channel" variant={variant} emphasis={metadataLabelEmphasis}>
+              <input
+                id="payload-source"
+                value={source}
+                placeholder="e.g. darknet, social-feed"
+                onChange={(event) => setSource(event.target.value)}
+                className={inputClass}
+              />
+            </InputField>
+            <InputField label="Analyst tags" variant={variant} emphasis={metadataLabelEmphasis}>
+              <input
+                id="payload-tags"
+                value={tags}
+                placeholder="disinfo, amplification"
+                onChange={(event) => setTags(event.target.value)}
+                className={inputClass}
+              />
+            </InputField>
+          </>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3 text-sm">
-        <InputField label="Platform" variant={variant} emphasis={metadataLabelEmphasis}>
-          <input
-            id="payload-platform"
-            value={platform}
-            placeholder="telegram, state-media"
-            onChange={(event) => setPlatform(event.target.value)}
-            className={inputClass}
-          />
-        </InputField>
+      <div className={`grid grid-cols-1 gap-4 text-sm ${userRole === 'enterprise' ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+        {userRole === 'enterprise' && (
+          <InputField label="Platform" variant={variant} emphasis={metadataLabelEmphasis}>
+            <input
+              id="payload-platform"
+              value={platform}
+              placeholder="telegram, state-media"
+              onChange={(event) => setPlatform(event.target.value)}
+              className={inputClass}
+            />
+          </InputField>
+        )}
         <InputField label="Region" variant={variant} emphasis={metadataLabelEmphasis}>
           <div ref={regionInputRef} className="relative">
             <input
               id="payload-region"
               value={region}
-              placeholder="Start typing city name..."
+              placeholder={isDetectingLocation ? "Detecting location..." : "Start typing city name..."}
               required
-              onChange={(event) => handleRegionChange(event.target.value)}
+              onChange={(event) => {
+                handleRegionChange(event.target.value);
+                setLocationDetected(false); // Clear detection flag if user edits
+              }}
               onFocus={() => {
                 if (region.trim() && filteredCities.length > 0) {
                   setShowRegionSuggestions(true);
@@ -340,7 +377,17 @@ export default function IntakeForm({
               }}
               className={inputClass}
               autoComplete="off"
+              disabled={isDetectingLocation}
             />
+            {locationDetected && !isDetectingLocation && (
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs text-emerald-500">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="hidden sm:inline">Auto-detected</span>
+              </div>
+            )}
             {showRegionSuggestions && filteredCities.length > 0 && (
               <div className="absolute z-10 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-900/95 backdrop-blur-sm shadow-xl">
                 {filteredCities.map((city, index) => (
@@ -357,15 +404,17 @@ export default function IntakeForm({
             )}
           </div>
         </InputField>
-        <InputField label="Actor ID" variant={variant} emphasis={metadataLabelEmphasis}>
-          <input
-            id="payload-actor"
-            value={actorId}
-            placeholder="Suspected cell"
-            onChange={(event) => setActorId(event.target.value)}
-            className={inputClass}
-          />
-        </InputField>
+        {userRole === 'enterprise' && (
+          <InputField label="Actor ID" variant={variant} emphasis={metadataLabelEmphasis}>
+            <input
+              id="payload-actor"
+              value={actorId}
+              placeholder="Suspected cell"
+              onChange={(event) => setActorId(event.target.value)}
+              className={inputClass}
+            />
+          </InputField>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-4">

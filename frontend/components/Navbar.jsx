@@ -5,13 +5,16 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Shield } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 
 export default function Navbar({ onMenuClick }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const { user, logout } = useAuth();
   
   const isLandingPage = pathname === "/";
-  const isAppPage = !isLandingPage;
+  const isAuthPage = pathname === "/login" || pathname === "/signup";
+  const isAppPage = !isLandingPage && !isAuthPage;
 
   // Navigation items for landing page
   const landingNavItems = [
@@ -75,16 +78,46 @@ export default function Navbar({ onMenuClick }) {
                 </Link>
               );
             })}
-            {isLandingPage && (
+            {isLandingPage && !user && (
+              <>
+                <Link href="/login">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-slate-300 hover:text-white hover:bg-slate-800/50"
+                  >
+                    Sign In
+                  </Button>
+                </Link>
+                <Link href="/signup">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border-emerald-500/30 text-white hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all"
+                  >
+                    Get Started
+                  </Button>
+                </Link>
+              </>
+            )}
+            {isLandingPage && user && (
               <Link href="/dashboard">
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="ml-2 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border-emerald-500/30 text-white hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all"
+                  className="bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border-emerald-500/30 text-white hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all"
                 >
                   Dashboard
                 </Button>
               </Link>
+            )}
+            {isAppPage && user && (
+              <button
+                onClick={logout}
+                className="text-sm font-medium text-slate-300 hover:text-white transition-colors"
+              >
+                Logout
+              </button>
             )}
           </div>
 
@@ -117,7 +150,29 @@ export default function Navbar({ onMenuClick }) {
                 </Link>
               );
             })}
-            {isLandingPage && (
+            {isLandingPage && !user && (
+              <div className="space-y-2 mt-2">
+                <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="w-full text-slate-300 hover:text-white hover:bg-slate-800/50"
+                  >
+                    Sign In
+                  </Button>
+                </Link>
+                <Link href="/signup" onClick={() => setMobileMenuOpen(false)}>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border-emerald-500/30 text-white"
+                  >
+                    Get Started
+                  </Button>
+                </Link>
+              </div>
+            )}
+            {isLandingPage && user && (
               <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)}>
                 <Button 
                   variant="outline" 
@@ -127,6 +182,17 @@ export default function Navbar({ onMenuClick }) {
                   Dashboard
                 </Button>
               </Link>
+            )}
+            {isAppPage && user && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  logout();
+                }}
+                className="w-full text-left text-sm font-medium text-slate-300 hover:text-white py-2.5 px-2 rounded-lg hover:bg-slate-800/50 transition-colors"
+              >
+                Logout
+              </button>
             )}
           </div>
         )}

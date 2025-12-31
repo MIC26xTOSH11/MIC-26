@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Inter, Space_Grotesk } from "next/font/google";
+import { AuthProvider } from "../lib/auth";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -23,7 +24,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
       <body className="bg-slate-950">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

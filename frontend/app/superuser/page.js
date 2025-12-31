@@ -2,19 +2,63 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
 import WorldHeatmapLeaflet from "@/components/WorldHeatmapLeaflet";
 import ThemeToggle from "@/components/ThemeToggle";
 import SystemMonitor from "@/components/SystemMonitor";
+import UpgradePrompt from "@/components/UpgradePrompt";
 
 export default function SuperUserPage() {
   const router = useRouter();
+  const { user, loading, hasPermission } = useAuth();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  if (!mounted) return null;
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
+
+  if (!mounted || loading) return null;
+  
+  // Show upgrade prompt for individual users
+  if (user && !hasPermission('view_detailed_reports')) {
+    return (
+      <main className="relative min-h-screen pb-20 overflow-x-hidden bg-slate-950">
+        <div className="absolute -left-32 top-20 h-72 w-72 rounded-full bg-purple-500/30 blur-3xl opacity-20" />
+        <div className="absolute -right-44 bottom-[-6rem] h-96 w-96 rounded-full bg-fuchsia-500/20 blur-[160px] opacity-40" />
+        
+        <header className="relative z-10 border-b border-purple-500/20 bg-gradient-to-br from-purple-500/10 via-slate-900 to-slate-950">
+          <div className="mx-auto max-w-7xl px-6 py-12">
+            <div className="flex items-center justify-between mb-8">
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-700/50"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Back to Dashboard
+              </button>
+              <ThemeToggle />
+            </div>
+          </div>
+        </header>
+        
+        <div className="relative z-10 mx-auto max-w-4xl px-6 py-12">
+          <UpgradePrompt 
+            feature="Advanced Reports & Management" 
+            description="Get full access to system monitoring, detailed reports, audit trails, data export, and advanced management features with the Enterprise plan."
+          />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="relative min-h-screen pb-20 overflow-x-hidden bg-slate-950">

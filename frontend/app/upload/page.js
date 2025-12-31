@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
+import UpgradePrompt from "@/components/UpgradePrompt";
 import DragDropZone from "@/components/DragDropZone";
 import RegionAutocompleteInput from "@/components/RegionAutocompleteInput";
 import { submitIntake } from "@/lib/api";
@@ -25,10 +28,29 @@ const SUPPORTED_LANGUAGES = [
 ];
 
 export default function UploadPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
   const [results, setResults] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState({ message: "", tone: "success" });
   const [pendingFiles, setPendingFiles] = useState([]);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
+
+  // Show upgrade prompt if not enterprise
+  if (!loading && user && user.role !== 'enterprise') {
+    return <UpgradePrompt feature="Bulk Upload" />;
+  }
+
+  // Don't render if not authenticated
+  if (!user) {
+    return null;
+  }
 
   const handleFilesAccepted = async (fileContents) => {
     // Queue files for analysis instead of analyzing immediately
