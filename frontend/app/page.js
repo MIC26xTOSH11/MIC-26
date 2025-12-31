@@ -10,6 +10,7 @@ import { ScrollTrigger } from 'gsap/dist/ScrollTrigger';
 import { Button } from "@/components/ui/button";
 import TeamGrid from "@/components/ui/team-grid";
 import RuixenStats from "@/components/ui/ruixen-stats";
+import FAQWithSpiral from "@/components/ui/faq-section";
 import {
   Menu,
   X,
@@ -158,18 +159,18 @@ export default function LandingPage() {
         }`}
       >
         <div className="bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 space-y-3">
-          <Link href="/dashboard" className="block text-white hover:text-emerald-400 transition-colors">
-            Dashboard
-          </Link>
-          <Link href="/analytics" className="block text-white hover:text-emerald-400 transition-colors">
+          <a href="#analytics" className="block text-white hover:text-emerald-400 transition-colors" onClick={() => setMenuOpen(false)}>
             Analytics
-          </Link>
+          </a>
           <Link href="#features" className="block text-white hover:text-emerald-400 transition-colors" onClick={() => setMenuOpen(false)}>
             Features
           </Link>
           <Link href="#team" className="block text-white hover:text-emerald-400 transition-colors" onClick={() => setMenuOpen(false)}>
             Team
           </Link>
+          <a href="#faq" className="block text-white hover:text-emerald-400 transition-colors" onClick={() => setMenuOpen(false)}>
+            FAQ
+          </a>
           <div className="border-t border-white/10 pt-3 mt-3">
             <Link href="/login">
               <Button className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white">
@@ -300,10 +301,19 @@ export default function LandingPage() {
         </section>
 
         {/* Team Section */}
-        <TeamGrid />
+        <div id="team">
+          <TeamGrid />
+        </div>
 
         {/* Analytics Stats Section */}
-        <RuixenStats />
+        <div id="analytics">
+          <RuixenStats />
+        </div>
+
+        {/* FAQ Section */}
+        <div id="faq">
+          <FAQWithSpiral />
+        </div>
 
         {/* CTA Section */}
         <section

@@ -177,7 +177,13 @@ const SignupComponent = () => {
   ];
 
   return (
-    <div className="h-screen w-[100%] bg-[var(--color-bg)] flex items-center justify-center p-4">
+    <div className="h-screen w-[100%] bg-[var(--color-bg)] flex items-center justify-center p-4 relative">
+      <a href="/" className="absolute top-4 left-4 z-50 flex items-center gap-2 text-white hover:text-emerald-400 transition-colors group">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:scale-110 transition-transform">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <span className="font-semibold text-sm">Tattvadrishti</span>
+      </a>
       <div className='card w-[80%] lg:w-[70%] md:w-[55%] flex justify-between h-[600px]'>
         <div
           className='w-full lg:w-1/2 px-4 lg:px-16 left h-full relative overflow-hidden'
@@ -222,7 +228,7 @@ const SignupComponent = () => {
                     </ul>
                   </div>
                 </div>
-                <span className='text-sm'>or use your email for registration</span>
+                <span className='text-sm'>or Continue with username</span>
               </div>
               
               <div className='flex gap-2 justify-center mb-2'>
