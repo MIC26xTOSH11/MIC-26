@@ -39,7 +39,7 @@ export default function HomePage() {
   useEffect(() => {
     const loadExistingCases = async () => {
       try {
-        const data = await listCases(20);
+        const data = await listCases(100);  // Load same amount as submissions page
         if (data.cases && data.cases.length > 0) {
           setResults(sortResults(data.cases));
         }
@@ -58,8 +58,10 @@ export default function HomePage() {
   }, [toast]);
 
   useEffect(() => {
+    console.log('[Dashboard] Setting up EventSource connection');
     const source = createEventStream(
       async (event) => {
+        console.log('[Dashboard] Event received in callback:', event);
         setEvents((prev) => [event, ...prev].slice(0, 20));
         upsertResult({
           intake_id: event.intake_id,
@@ -82,7 +84,10 @@ export default function HomePage() {
       }
     );
 
-    return () => source.close();
+    return () => {
+      console.log('[Dashboard] Cleaning up EventSource connection');
+      source.close();
+    };
   }, []);
 
   const upsertResult = (result) => {
@@ -136,15 +141,18 @@ export default function HomePage() {
 
   const metrics = useMemo(() => {
     const total = results.length;
-    const malicious = results.filter((r) =>
-      (r.classification || "").toLowerCase().includes("malicious")
-    ).length;
-    const suspicious = results.filter((r) =>
-      (r.classification || "").toLowerCase().includes("suspicious")
-    ).length;
-    const benign = results.filter((r) =>
-      (r.classification || "").toLowerCase().includes("benign")
-    ).length;
+    const malicious = results.filter((r) => {
+      const cls = (r.classification || "").toLowerCase();
+      return cls.includes("malicious") || cls.includes("high-risk");
+    }).length;
+    const suspicious = results.filter((r) => {
+      const cls = (r.classification || "").toLowerCase();
+      return cls.includes("suspicious") || cls.includes("medium-risk");
+    }).length;
+    const benign = results.filter((r) => {
+      const cls = (r.classification || "").toLowerCase();
+      return cls.includes("benign") || cls.includes("low-risk");
+    }).length;
     const average =
       total === 0
         ? 0
@@ -202,7 +210,7 @@ export default function HomePage() {
                       ? 'bg-gradient-to-r from-purple-500/30 to-violet-500/30 text-purple-200 border border-purple-400/60 ring-1 ring-purple-500/20'
                       : 'bg-gradient-to-r from-blue-500/30 to-cyan-500/30 text-blue-200 border border-blue-400/60 ring-1 ring-blue-500/20'
                   }`}>
-                    {user.role === 'enterprise' ? '👑 Enterprise' : '⭐ Individual'}
+                    {user.role === 'enterprise' ? ' Enterprise' : ' Individual'}
                   </div>
                 )}
               </div>

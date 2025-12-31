@@ -10,6 +10,7 @@ export default function DragDropZone({
     "text/html": [".html", ".htm"],
     "application/json": [".json"],
     "message/rfc822": [".eml"],
+    "application/pdf": [".pdf"],
   },
   maxFiles = 5,
   title = "Drag & Drop Files",
@@ -23,10 +24,38 @@ export default function DragDropZone({
       setFiles(acceptedFiles);
       setProcessing(true);
 
-      // Read file contents
+      // Read file contents with PDF support
       const fileContents = await Promise.all(
         acceptedFiles.map(async (file) => {
-          const text = await file.text();
+          let text = "";
+          
+          // Handle PDF files
+          if (file.type === "application/pdf") {
+            try {
+              // Use pdfjs-dist for PDF text extraction
+              const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
+              pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+              
+              const arrayBuffer = await file.arrayBuffer();
+              const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+              
+              const textParts = [];
+              for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                const pageText = content.items.map(item => item.str).join(" ");
+                textParts.push(pageText);
+              }
+              text = textParts.join("\\n\\n");
+            } catch (error) {
+              console.error("Failed to extract PDF text:", error);
+              text = `[PDF text extraction failed: ${error.message}]`;
+            }
+          } else {
+            // For non-PDF files, read as text
+            text = await file.text();
+          }
+          
           return {
             name: file.name,
             size: file.size,

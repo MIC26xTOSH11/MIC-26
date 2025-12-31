@@ -251,10 +251,11 @@ export default function UploadPage() {
               "text/html": [".html", ".htm"],
               "application/json": [".json"],
               "message/rfc822": [".eml"],
+              "application/pdf": [".pdf"],
             }}
             maxFiles={10}
             title="Drop Your Files Here"
-            description="Supports emails (.eml), text files (.txt), HTML, and JSON social posts"
+            description="Supports emails (.eml), text files (.txt), HTML, PDF documents, and JSON social posts"
           />
 
           {/* Region selection & analyze controls */}
@@ -324,6 +325,15 @@ export default function UploadPage() {
                 <div>
                   <p className="text-sm font-medium text-slate-300">Email Files (.eml)</p>
                   <p className="text-xs text-slate-500">Standard RFC822 email format with headers</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <svg className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <div>
+                  <p className="text-sm font-medium text-slate-300">PDF Documents (.pdf)</p>
+                  <p className="text-xs text-slate-500">Portable Document Format with text extraction</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">

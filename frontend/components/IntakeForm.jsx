@@ -41,6 +41,7 @@ export default function IntakeForm({
   const [filteredCities, setFilteredCities] = useState([]);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [locationDetected, setLocationDetected] = useState(false);
+  const [userClearedRegion, setUserClearedRegion] = useState(false);
   const recognitionRef = useRef(null);
   const regionInputRef = useRef(null);
   const [isListening, setIsListening] = useState(false);
@@ -78,15 +79,24 @@ export default function IntakeForm({
   // Auto-detect location on component mount and when region is cleared
   useEffect(() => {
     const detectLocation = async () => {
-      // Only auto-detect if region is empty and we're not already detecting
-      if (region || isDetectingLocation) return;
+      // Only auto-detect if region is empty, we're not already detecting, and user hasn't manually cleared it
+      if (region || isDetectingLocation || userClearedRegion) return;
       
       setIsDetectingLocation(true);
       try {
         const locationData = await getUserLocation();
+        console.log("Location detection response:", locationData);
+        
         if (locationData?.detected && locationData?.location?.region) {
+          console.log("Setting region to:", locationData.location.region);
           setRegion(locationData.location.region);
           setLocationDetected(true);
+        } else {
+          console.log("Detection failed or no region:", {
+            detected: locationData?.detected,
+            region: locationData?.location?.region,
+            fullResponse: locationData
+          });
         }
       } catch (error) {
         console.error("Location detection failed:", error);
@@ -96,7 +106,7 @@ export default function IntakeForm({
     };
 
     detectLocation();
-  }, [region]); // Re-run only when region changes (not isDetectingLocation to avoid infinite loop)
+  }, [region, userClearedRegion]); // Re-run only when region or userClearedRegion changes
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -168,6 +178,13 @@ export default function IntakeForm({
 
   const handleRegionChange = (value) => {
     setRegion(value);
+    // Track if user manually cleared the field
+    if (!value.trim()) {
+      setUserClearedRegion(true);
+    } else {
+      setUserClearedRegion(false);
+    }
+    
     if (value.trim()) {
       const filtered = CITIES.filter(city =>
         city.toLowerCase().includes(value.toLowerCase())
@@ -249,6 +266,7 @@ export default function IntakeForm({
       setTags("");
       setSpeechError("");
       setLocationDetected(false); // Reset detection flag so it can auto-detect again
+      setUserClearedRegion(false); // Reset manual clear flag to allow auto-detection
     }
   };
 
@@ -359,7 +377,12 @@ export default function IntakeForm({
             />
           </InputField>
         )}
-        <InputField label="Region" variant={variant} emphasis={metadataLabelEmphasis}>
+        <InputField 
+          label="Region" 
+          variant={variant} 
+          emphasis={metadataLabelEmphasis}
+          showAutoDetected={userRole === 'enterprise' && locationDetected && !isDetectingLocation}
+        >
           <div ref={regionInputRef} className="relative">
             <input
               id="payload-region"
@@ -379,13 +402,13 @@ export default function IntakeForm({
               autoComplete="off"
               disabled={isDetectingLocation}
             />
-            {locationDetected && !isDetectingLocation && (
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs text-emerald-500">
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {locationDetected && !isDetectingLocation && userRole !== 'enterprise' && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs text-emerald-500 pointer-events-none">
+                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <span className="hidden sm:inline">Auto-detected</span>
+                <span className="hidden lg:inline whitespace-nowrap">Auto-detected</span>
               </div>
             )}
             {showRegionSuggestions && filteredCities.length > 0 && (
@@ -448,7 +471,7 @@ export default function IntakeForm({
   );
 }
 
-function InputField({ label, children, variant = "dark", emphasis = "normal" }) {
+function InputField({ label, children, variant = "dark", emphasis = "normal", showAutoDetected = false }) {
   const isLight = variant === "light";
   const baseColor = isLight ? "text-slate-500" : "text-slate-400";
   const emphasisClass =
@@ -464,9 +487,18 @@ function InputField({ label, children, variant = "dark", emphasis = "normal" }) 
       }`}
     >
       <span
-        className={`text-xs uppercase tracking-[0.3em] ${emphasisClass}`}
+        className={`text-xs uppercase tracking-[0.3em] ${emphasisClass} flex items-center gap-1.5`}
       >
         {label}
+        {showAutoDetected && (
+          <span className="flex items-center gap-1 text-emerald-500 normal-case tracking-normal font-normal">
+            <svg className="h-3 w-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="whitespace-nowrap">Auto-detected</span>
+          </span>
+        )}
       </span>
       {children}
     </label>

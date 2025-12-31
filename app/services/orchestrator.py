@@ -20,7 +20,7 @@ class AnalysisOrchestrator:
         self.watermark = WatermarkEngine()
         self.graph = GraphIntelEngine()
         self.db = Database()
-        self._event_queue: "asyncio.Queue[Dict[str, Any]]" = asyncio.Queue(maxsize=200)
+        self._event_queues: list["asyncio.Queue[Dict[str, Any]]"] = []  # List of queues for broadcasting
 
     async def process_intake(self, intake: ContentIntake) -> DetectionResult:
         return await run_in_threadpool(self._process_sync, intake)
@@ -84,21 +84,34 @@ class AnalysisOrchestrator:
             decision_reason=decision_reason,
         )
 
-        self._emit_event(
-            {
-                "type": "analysis_completed",
-                "intake_id": intake_id,
-                "score": composite_score,
-                "classification": classification,
-                "submitted_at": submitted_at.isoformat(),
-            }
-        )
+        event_data = {
+            "type": "analysis_completed",
+            "intake_id": intake_id,
+            "score": composite_score,
+            "classification": classification,
+            "submitted_at": submitted_at.isoformat(),
+        }
+        print(f"[Orchestrator] Emitting event: {event_data}")
+        self._emit_event(event_data)
         return result
 
     async def stream_events(self) -> AsyncGenerator[Dict[str, Any], None]:
-        while True:
-            event = await self._event_queue.get()
-            yield event
+        # Create a new queue for this client
+        queue: "asyncio.Queue[Dict[str, Any]]" = asyncio.Queue(maxsize=200)
+        self._event_queues.append(queue)
+        client_id = len(self._event_queues)
+        print(f"[Orchestrator] Client {client_id} registered. Active clients: {len(self._event_queues)}")
+        
+        try:
+            while True:
+                event = await queue.get()
+                print(f"[Orchestrator] Yielding event to client {client_id}: {event}")
+                yield event
+        finally:
+            # Clean up when client disconnects
+            if queue in self._event_queues:
+                self._event_queues.remove(queue)
+            print(f"[Orchestrator] Client {client_id} disconnected. Active clients: {len(self._event_queues)}")
 
     def check_fingerprint(self, text: str) -> list[Dict[str, Any]]:
         return self.db.check_fingerprint(text)
@@ -309,9 +322,16 @@ class AnalysisOrchestrator:
         return " ".join(reason_parts)
 
     def _emit_event(self, event: Dict[str, Any]) -> None:
-        try:
-            self._event_queue.put_nowait(event)
-        except asyncio.QueueFull:
-            # Drop oldest if backpressure occurs
-            self._event_queue.get_nowait()
-            self._event_queue.put_nowait(event)
+        print(f"[Orchestrator] Broadcasting event to {len(self._event_queues)} clients")
+        for i, queue in enumerate(self._event_queues, 1):
+            try:
+                queue.put_nowait(event)
+                print(f"[Orchestrator] Event sent to client {i}")
+            except asyncio.QueueFull:
+                print(f"[Orchestrator] Queue full for client {i}, dropping oldest event")
+                # Drop oldest if backpressure occurs
+                try:
+                    queue.get_nowait()
+                    queue.put_nowait(event)
+                except:
+                    pass

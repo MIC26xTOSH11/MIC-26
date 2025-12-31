@@ -111,7 +111,7 @@ export default function Sidebar({ isOpen, onClose }) {
                       ? 'bg-purple-500/30 text-purple-300'
                       : 'bg-blue-500/30 text-blue-300'
                   }`}>
-                    {user.role === 'enterprise' ? '👑 Pro' : '⭐ Basic'}
+                    {user.role === 'enterprise' ? ' Pro' : ' Basic'}
                   </div>
                 </div>
               </div>

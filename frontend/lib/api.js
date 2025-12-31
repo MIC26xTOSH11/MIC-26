@@ -119,18 +119,27 @@ export async function listCases(limit = 50) {
 // Simple Server-Sent Events (SSE) stream for live updates
 export function createEventStream(onEvent, onError) {
   const url = `${API_BASE_URL}/api/v1/events/stream`;
+  console.log('[EventStream] Connecting to:', url);
   const source = new EventSource(url);
 
+  source.onopen = () => {
+    console.log('[EventStream] Connection opened');
+  };
+
   source.onmessage = (e) => {
+    console.log('[EventStream] Received event:', e.data);
     try {
       const data = JSON.parse(e.data);
+      console.log('[EventStream] Parsed event:', data);
       onEvent && onEvent(data);
     } catch (err) {
-      console.error("Failed to parse event", err);
+      console.error("[EventStream] Failed to parse event", err);
     }
   };
 
-  source.onerror = () => {
+  source.onerror = (err) => {
+    console.error('[EventStream] Error:', err);
+    console.log('[EventStream] ReadyState:', source.readyState);
     onError && onError();
   };
 

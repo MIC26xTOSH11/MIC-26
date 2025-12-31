@@ -109,6 +109,26 @@ def detect_location_from_ip(ip_address: str) -> dict:
     Detect location from IP address using MaxMind GeoLite2
     Returns dict with city, country, and coordinates
     """
+    # Handle private/local IPs first (before checking database)
+    # RFC 1918 private ranges: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+    is_private = (
+        ip_address in ["127.0.0.1", "localhost", "::1"] or
+        ip_address.startswith("10.") or
+        ip_address.startswith("192.168.") or
+        (ip_address.startswith("172.") and 16 <= int(ip_address.split(".")[1]) <= 31)
+    )
+    
+    if is_private:
+        return {
+            "city": "Local",
+            "country": "Local",
+            "region": "Local Network",
+            "latitude": None,
+            "longitude": None,
+            "note": "Development environment - private IP address"
+        }
+    
+    # For non-local IPs, require the database
     if not geoip_reader:
         return {
             "city": None,
@@ -116,18 +136,7 @@ def detect_location_from_ip(ip_address: str) -> dict:
             "region": None,
             "latitude": None,
             "longitude": None,
-            "error": "GeoIP database not available"
-        }
-    
-    # Skip private/local IPs
-    if ip_address in ["127.0.0.1", "localhost", "::1"] or ip_address.startswith("192.168.") or ip_address.startswith("10."):
-        return {
-            "city": "Local",
-            "country": "Local",
-            "region": "Local Network",
-            "latitude": None,
-            "longitude": None,
-            "error": "Private IP address"
+            "error": "GeoIP database not available. See docs/GEOIP_SETUP.md for setup instructions."
         }
     
     try:
@@ -369,12 +378,27 @@ async def siem_feed() -> SIEMCorrelationPayload:
 
 
 @app.get("/api/v1/events/stream")
-async def stream_events():
+async def stream_events(request: Request):
+    logger.info(f"[SSE] Client connected from {request.client.host}")
+    
     async def event_generator():
-        async for event in orchestrator.stream_events():
-            yield f"data: {json.dumps(event)}\n\n"
+        try:
+            async for event in orchestrator.stream_events():
+                logger.info(f"[SSE] Sending event to client: {event}")
+                yield f"data: {json.dumps(event)}\n\n"
+        except Exception as e:
+            logger.error(f"[SSE] Error in event generator: {e}")
+            raise
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(), 
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        }
+    )
 
 
 class FingerprintCheckPayload(BaseModel):
