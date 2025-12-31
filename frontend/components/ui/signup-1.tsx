@@ -4,6 +4,7 @@ import * as React from 'react'
 import { useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation';
+import { API_BASE_URL } from '@/lib/api';
 
 interface InputProps {
   label?: string;
@@ -109,7 +110,7 @@ const SignupComponent = () => {
     setIsLoading(true);
 
     try {
-      const signupResponse = await fetch('http://localhost:8000/api/v1/auth/signup', {
+      const signupResponse = await fetch(`${API_BASE_URL}/api/v1/auth/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -126,7 +127,7 @@ const SignupComponent = () => {
         throw new Error(errorData.detail || 'Signup failed');
       }
 
-      const loginResponse = await fetch('http://localhost:8000/api/v1/auth/login', {
+      const loginResponse = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
