@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CITIES } from "@/lib/cities";
+import { getUserLocation } from "@/lib/api";
 
 const minCharacters = 20;
 
@@ -27,6 +28,7 @@ export default function IntakeForm({
   onValidationError,
   variant = "dark",
   metadataLabelStyle = "normal",
+  userRole = "enterprise",
 }) {
   const [text, setText] = useState("");
   const [language, setLanguage] = useState("en");
@@ -37,6 +39,9 @@ export default function IntakeForm({
   const [tags, setTags] = useState("");
   const [showRegionSuggestions, setShowRegionSuggestions] = useState(false);
   const [filteredCities, setFilteredCities] = useState([]);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [locationDetected, setLocationDetected] = useState(false);
+  const [userClearedRegion, setUserClearedRegion] = useState(false);
   const recognitionRef = useRef(null);
   const regionInputRef = useRef(null);
   const [isListening, setIsListening] = useState(false);
@@ -70,6 +75,38 @@ export default function IntakeForm({
     : "border-emerald-400/40 bg-emerald-500/10 text-emerald-200";
   const statusTextClass = isLight ? "text-xs text-slate-500" : "text-xs text-slate-400";
   const metadataLabelEmphasis = metadataLabelStyle === "bold" ? "bold" : "normal";
+
+  // Auto-detect location on component mount and when region is cleared
+  useEffect(() => {
+    const detectLocation = async () => {
+      // Only auto-detect if region is empty, we're not already detecting, and user hasn't manually cleared it
+      if (region || isDetectingLocation || userClearedRegion) return;
+      
+      setIsDetectingLocation(true);
+      try {
+        const locationData = await getUserLocation();
+        console.log("Location detection response:", locationData);
+        
+        if (locationData?.detected && locationData?.location?.region) {
+          console.log("Setting region to:", locationData.location.region);
+          setRegion(locationData.location.region);
+          setLocationDetected(true);
+        } else {
+          console.log("Detection failed or no region:", {
+            detected: locationData?.detected,
+            region: locationData?.location?.region,
+            fullResponse: locationData
+          });
+        }
+      } catch (error) {
+        console.error("Location detection failed:", error);
+      } finally {
+        setIsDetectingLocation(false);
+      }
+    };
+
+    detectLocation();
+  }, [region, userClearedRegion]); // Re-run only when region or userClearedRegion changes
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -141,6 +178,13 @@ export default function IntakeForm({
 
   const handleRegionChange = (value) => {
     setRegion(value);
+    // Track if user manually cleared the field
+    if (!value.trim()) {
+      setUserClearedRegion(true);
+    } else {
+      setUserClearedRegion(false);
+    }
+    
     if (value.trim()) {
       const filtered = CITIES.filter(city =>
         city.toLowerCase().includes(value.toLowerCase())
@@ -221,6 +265,8 @@ export default function IntakeForm({
       setActorId("");
       setTags("");
       setSpeechError("");
+      setLocationDetected(false); // Reset detection flag so it can auto-detect again
+      setUserClearedRegion(false); // Reset manual clear flag to allow auto-detection
     }
   };
 
@@ -295,44 +341,58 @@ export default function IntakeForm({
             ))}
           </select>
         </InputField>
-        <InputField label="Source channel" variant={variant} emphasis={metadataLabelEmphasis}>
-          <input
-            id="payload-source"
-            value={source}
-            placeholder="e.g. darknet, social-feed"
-            onChange={(event) => setSource(event.target.value)}
-            className={inputClass}
-          />
-        </InputField>
-        <InputField label="Analyst tags" variant={variant} emphasis={metadataLabelEmphasis}>
-          <input
-            id="payload-tags"
-            value={tags}
-            placeholder="disinfo, amplification"
-            onChange={(event) => setTags(event.target.value)}
-            className={inputClass}
-          />
-        </InputField>
+        {userRole === 'enterprise' && (
+          <>
+            <InputField label="Source channel" variant={variant} emphasis={metadataLabelEmphasis}>
+              <input
+                id="payload-source"
+                value={source}
+                placeholder="e.g. darknet, social-feed"
+                onChange={(event) => setSource(event.target.value)}
+                className={inputClass}
+              />
+            </InputField>
+            <InputField label="Analyst tags" variant={variant} emphasis={metadataLabelEmphasis}>
+              <input
+                id="payload-tags"
+                value={tags}
+                placeholder="disinfo, amplification"
+                onChange={(event) => setTags(event.target.value)}
+                className={inputClass}
+              />
+            </InputField>
+          </>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3 text-sm">
-        <InputField label="Platform" variant={variant} emphasis={metadataLabelEmphasis}>
-          <input
-            id="payload-platform"
-            value={platform}
-            placeholder="telegram, state-media"
-            onChange={(event) => setPlatform(event.target.value)}
-            className={inputClass}
-          />
-        </InputField>
-        <InputField label="Region" variant={variant} emphasis={metadataLabelEmphasis}>
+      <div className={`grid grid-cols-1 gap-4 text-sm ${userRole === 'enterprise' ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+        {userRole === 'enterprise' && (
+          <InputField label="Platform" variant={variant} emphasis={metadataLabelEmphasis}>
+            <input
+              id="payload-platform"
+              value={platform}
+              placeholder="telegram, state-media"
+              onChange={(event) => setPlatform(event.target.value)}
+              className={inputClass}
+            />
+          </InputField>
+        )}
+        <InputField 
+          label="Region" 
+          variant={variant} 
+          emphasis={metadataLabelEmphasis}
+          showAutoDetected={userRole === 'enterprise' && locationDetected && !isDetectingLocation}
+        >
           <div ref={regionInputRef} className="relative">
             <input
               id="payload-region"
               value={region}
-              placeholder="Start typing city name..."
+              placeholder={isDetectingLocation ? "Detecting location..." : "Start typing city name..."}
               required
-              onChange={(event) => handleRegionChange(event.target.value)}
+              onChange={(event) => {
+                handleRegionChange(event.target.value);
+                setLocationDetected(false); // Clear detection flag if user edits
+              }}
               onFocus={() => {
                 if (region.trim() && filteredCities.length > 0) {
                   setShowRegionSuggestions(true);
@@ -340,7 +400,17 @@ export default function IntakeForm({
               }}
               className={inputClass}
               autoComplete="off"
+              disabled={isDetectingLocation}
             />
+            {locationDetected && !isDetectingLocation && userRole !== 'enterprise' && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs text-emerald-500 pointer-events-none">
+                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="hidden lg:inline whitespace-nowrap">Auto-detected</span>
+              </div>
+            )}
             {showRegionSuggestions && filteredCities.length > 0 && (
               <div className="absolute z-10 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-900/95 backdrop-blur-sm shadow-xl">
                 {filteredCities.map((city, index) => (
@@ -357,15 +427,17 @@ export default function IntakeForm({
             )}
           </div>
         </InputField>
-        <InputField label="Actor ID" variant={variant} emphasis={metadataLabelEmphasis}>
-          <input
-            id="payload-actor"
-            value={actorId}
-            placeholder="Suspected cell"
-            onChange={(event) => setActorId(event.target.value)}
-            className={inputClass}
-          />
-        </InputField>
+        {userRole === 'enterprise' && (
+          <InputField label="Actor ID" variant={variant} emphasis={metadataLabelEmphasis}>
+            <input
+              id="payload-actor"
+              value={actorId}
+              placeholder="Suspected cell"
+              onChange={(event) => setActorId(event.target.value)}
+              className={inputClass}
+            />
+          </InputField>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -399,7 +471,7 @@ export default function IntakeForm({
   );
 }
 
-function InputField({ label, children, variant = "dark", emphasis = "normal" }) {
+function InputField({ label, children, variant = "dark", emphasis = "normal", showAutoDetected = false }) {
   const isLight = variant === "light";
   const baseColor = isLight ? "text-slate-500" : "text-slate-400";
   const emphasisClass =
@@ -415,9 +487,18 @@ function InputField({ label, children, variant = "dark", emphasis = "normal" }) 
       }`}
     >
       <span
-        className={`text-xs uppercase tracking-[0.3em] ${emphasisClass}`}
+        className={`text-xs uppercase tracking-[0.3em] ${emphasisClass} flex items-center gap-1.5`}
       >
         {label}
+        {showAutoDetected && (
+          <span className="flex items-center gap-1 text-emerald-500 normal-case tracking-normal font-normal">
+            <svg className="h-3 w-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="whitespace-nowrap">Auto-detected</span>
+          </span>
+        )}
       </span>
       {children}
     </label>

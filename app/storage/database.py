@@ -63,6 +63,18 @@ class Database:
                 )
             """
             )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    last_login TEXT
+                )
+            """
+            )
 
     @contextmanager
     def _cursor(self):
@@ -276,3 +288,57 @@ class Database:
                 )
                 for r in rows
             ]
+
+    # ==================== User Management ====================
+
+    def create_user(self, username: str, password_hash: str, role: str) -> bool:
+        """Create a new user account. Returns True if successful, False if username exists."""
+        try:
+            with self._cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO users (username, password_hash, role, created_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (username.lower(), password_hash, role, datetime.utcnow().isoformat()),
+                )
+                return True
+        except sqlite3.IntegrityError:
+            # Username already exists
+            return False
+
+    def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
+        """Get user by username. Returns None if not found."""
+        with self._cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, username, password_hash, role, created_at, last_login
+                FROM users
+                WHERE username = ?
+                """,
+                (username.lower(),),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            return {
+                "id": row[0],
+                "username": row[1],
+                "password_hash": row[2],
+                "role": row[3],
+                "created_at": row[4],
+                "last_login": row[5],
+            }
+
+    def update_last_login(self, username: str) -> None:
+        """Update the last login timestamp for a user."""
+        with self._cursor() as cur:
+            cur.execute(
+                """
+                UPDATE users
+                SET last_login = ?
+                WHERE username = ?
+                """,
+                (datetime.utcnow().isoformat(), username.lower()),
+            )
+

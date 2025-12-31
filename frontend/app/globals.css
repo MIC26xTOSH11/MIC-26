@@ -21,11 +21,37 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 160 84% 39%;
+    
+    /* Login/Signup component variables */
+    --color-bg: #101214;
+    --color-surface: #161A1D;
+    --color-muted-surface: #1D2125;
+    --color-border: #2C333A;
+    --color-text-secondary: #596773;
+    --color-text-primary: #C7D1DB;
+    --color-heading: #DEE4EA;
+    --spacing-6: 1.5rem;
+    --rounded-lg: 0.5rem;
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+    --color-text-primary-rgb: 199, 209, 219;
+    --color-bg-2: #C7D1DB;
   }
 }
 
 :root {
   color-scheme: dark;
+}
+
+.dark {
+  --color-bg: #101214;
+  --color-surface: #161A1D;
+  --color-muted-surface: #1D2125;
+  --color-border: #2C333A;
+  --color-text-secondary: #596773;
+  --color-text-primary: #C7D1DB;
+  --color-heading: #DEE4EA;
+  --color-bg-2: #C7D1DB;
+  --color-text-primary-rgb: 199, 209, 219;
 }
 
 body {

@@ -41,6 +41,11 @@ class DetectionBreakdown(BaseModel):
     detected_language_name: Optional[str] = None  # Full name (e.g., 'English', 'Hindi')
     language_confidence: Optional[float] = None  # Detection confidence 0.0-1.0
     
+    # Enterprise Analytics Fields
+    consumer_vulnerability_risk: Optional[str] = None  # Options: "youth", "general", "elderly", "vulnerable"
+    recommended_actions: Optional[List[str]] = None  # Suggested actions based on risk
+    flagged_reason: Optional[str] = None  # Why content was flagged (malicious/suspicious)
+    
     stylometric_anomalies: Dict[str, float]
     heuristics: List[str]
 

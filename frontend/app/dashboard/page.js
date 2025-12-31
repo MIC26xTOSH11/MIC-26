@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/lib/auth";
+import { useRouter } from "next/navigation";
 import MetricCard from "@/components/MetricCard";
 import IntakeForm from "@/components/IntakeForm";
 import EventsFeed from "@/components/EventsFeed";
@@ -17,6 +19,8 @@ import {
 } from "@/lib/api";
 
 export default function HomePage() {
+  const { user, loading, logout } = useAuth();
+  const router = useRouter();
   const [results, setResults] = useState([]);
   const [events, setEvents] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -24,11 +28,18 @@ export default function HomePage() {
   const [showLatestResult, setShowLatestResult] = useState(false);
   const [latestSubmissionId, setLatestSubmissionId] = useState(null);
 
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
+
   // Load existing cases on mount
   useEffect(() => {
     const loadExistingCases = async () => {
       try {
-        const data = await listCases(20);
+        const data = await listCases(100);  // Load same amount as submissions page
         if (data.cases && data.cases.length > 0) {
           setResults(sortResults(data.cases));
         }
@@ -47,8 +58,10 @@ export default function HomePage() {
   }, [toast]);
 
   useEffect(() => {
+    console.log('[Dashboard] Setting up EventSource connection');
     const source = createEventStream(
       async (event) => {
+        console.log('[Dashboard] Event received in callback:', event);
         setEvents((prev) => [event, ...prev].slice(0, 20));
         upsertResult({
           intake_id: event.intake_id,
@@ -71,7 +84,10 @@ export default function HomePage() {
       }
     );
 
-    return () => source.close();
+    return () => {
+      console.log('[Dashboard] Cleaning up EventSource connection');
+      source.close();
+    };
   }, []);
 
   const upsertResult = (result) => {
@@ -125,15 +141,18 @@ export default function HomePage() {
 
   const metrics = useMemo(() => {
     const total = results.length;
-    const malicious = results.filter((r) =>
-      (r.classification || "").toLowerCase().includes("malicious")
-    ).length;
-    const suspicious = results.filter((r) =>
-      (r.classification || "").toLowerCase().includes("suspicious")
-    ).length;
-    const benign = results.filter((r) =>
-      (r.classification || "").toLowerCase().includes("benign")
-    ).length;
+    const malicious = results.filter((r) => {
+      const cls = (r.classification || "").toLowerCase();
+      return cls.includes("malicious") || cls.includes("high-risk");
+    }).length;
+    const suspicious = results.filter((r) => {
+      const cls = (r.classification || "").toLowerCase();
+      return cls.includes("suspicious") || cls.includes("medium-risk");
+    }).length;
+    const benign = results.filter((r) => {
+      const cls = (r.classification || "").toLowerCase();
+      return cls.includes("benign") || cls.includes("low-risk");
+    }).length;
     const average =
       total === 0
         ? 0
@@ -154,6 +173,20 @@ export default function HomePage() {
     return { total, malicious, suspicious, benign, average, lastUpdated };
   }, [results]);
 
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-950">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!user) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Hero Section */}
@@ -164,16 +197,41 @@ export default function HomePage() {
 
         <div className="relative z-10 mx-auto max-w-7xl">
           <div className="mb-8 flex items-center justify-between">
-            <ThemeToggle />
-            <Link
-              href="/simple"
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-300 transition hover:border-emerald-400 hover:text-emerald-300"
-            >
-              Guided Mode
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
+            <div className="flex items-center gap-4">
+              <ThemeToggle />
+              <div className="flex items-center gap-3">
+                <div className="text-sm">
+                  <span className="text-slate-400">Welcome, </span>
+                  <span className="font-semibold text-emerald-400">{user?.username || 'User'}</span>
+                </div>
+                {user?.role && (
+                  <div className={`px-3 py-1 rounded-full text-xs font-semibold shadow-lg ${
+                    user.role === 'enterprise'
+                      ? 'bg-gradient-to-r from-purple-500/30 to-violet-500/30 text-purple-200 border border-purple-400/60 ring-1 ring-purple-500/20'
+                      : 'bg-gradient-to-r from-blue-500/30 to-cyan-500/30 text-blue-200 border border-blue-400/60 ring-1 ring-blue-500/20'
+                  }`}>
+                    {user.role === 'enterprise' ? ' Enterprise' : ' Individual'}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <Link
+                href="/simple"
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-300 transition hover:border-emerald-400 hover:text-emerald-300"
+              >
+                Guided Mode
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+              <button
+                onClick={logout}
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-300 transition hover:border-red-400 hover:text-red-300"
+              >
+                Logout
+              </button>
+            </div>
           </div>
 
           <div className="mb-8">
@@ -273,7 +331,27 @@ export default function HomePage() {
             </div>
           </Link>
 
-         
+          {user?.role === 'enterprise' && (
+            <Link
+              href="/superuser"
+              className="group rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-500/10 to-pink-500/10 p-6 transition-all hover:border-purple-400/50 hover:from-purple-500/20 hover:to-pink-500/20"
+            >
+              <div className="flex items-center gap-4">
+                <div className="rounded-xl bg-purple-500/20 p-3 transition-all group-hover:bg-purple-500/30">
+                  <svg className="h-6 w-6 text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white flex items-center gap-2">
+                    Reports
+                    <span className="px-1.5 py-0.5 text-xs rounded bg-purple-500/30 text-purple-300">Pro</span>
+                  </h3>
+                  <p className="text-xs text-slate-400">Advanced reports</p>
+                </div>
+              </div>
+            </Link>
+          )}
         </div>
 
         {/* Latest Analysis Result */}
@@ -442,13 +520,13 @@ export default function HomePage() {
                           : "—"}
                       </span>
                     </div>
-                    {results[0].platform && (
+                    {user.role === 'enterprise' && results[0].platform && (
                       <div className="flex items-start justify-between border-b border-white/5 pb-3">
                         <span className="text-sm text-slate-500">Platform</span>
                         <span className="text-sm text-slate-300">{results[0].platform}</span>
                       </div>
                     )}
-                    {results[0].source && (
+                    {user.role === 'enterprise' && results[0].source && (
                       <div className="flex items-start justify-between border-b border-white/5 pb-3">
                         <span className="text-sm text-slate-500">Source</span>
                         <span className="max-w-xs truncate text-sm text-slate-300">{results[0].source}</span>
@@ -585,6 +663,89 @@ export default function HomePage() {
                   );
                 })()}
 
+                {/* Enterprise Analytics - Consumer Vulnerability Risk */}
+                {user?.role === 'enterprise' && results[0]?.breakdown?.consumer_vulnerability_risk && (
+                  <div className="rounded-2xl border border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-pink-500/5 p-6">
+                    <h3 className="mb-4 text-lg font-semibold text-white">
+                      Consumer Vulnerability Assessment
+                    </h3>
+                    <div className="flex items-center gap-3">
+                      <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${
+                        results[0].breakdown.consumer_vulnerability_risk === 'youth'
+                          ? 'bg-orange-500/20'
+                          : results[0].breakdown.consumer_vulnerability_risk === 'vulnerable'
+                          ? 'bg-red-500/20'
+                          : 'bg-blue-500/20'
+                      }`}>
+                        {results[0].breakdown.consumer_vulnerability_risk === 'youth' ? (
+                          <svg className="h-6 w-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                          </svg>
+                        ) : results[0].breakdown.consumer_vulnerability_risk === 'vulnerable' ? (
+                          <svg className="h-6 w-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                        ) : (
+                          <svg className="h-6 w-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-400">Target Demographics</p>
+                        <p className="text-lg font-semibold text-white capitalize">
+                          {results[0].breakdown.consumer_vulnerability_risk === 'youth' 
+                            ? 'Youth & Minors' 
+                            : results[0].breakdown.consumer_vulnerability_risk === 'vulnerable'
+                            ? 'Vulnerable Groups'
+                            : 'General Population'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Enterprise Analytics - Recommended Actions */}
+                {user?.role === 'enterprise' && results[0]?.breakdown?.recommended_actions && results[0].breakdown.recommended_actions.length > 0 && (
+                  <div className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 to-cyan-500/5 p-6">
+                    <h3 className="mb-4 text-lg font-semibold text-white">
+                      Recommended Actions
+                    </h3>
+                    <div className="space-y-2">
+                      {results[0].breakdown.recommended_actions.map((action, index) => (
+                        <div key={index} className="flex items-start gap-3 rounded-xl border border-white/5 bg-slate-900/40 p-3 transition-all hover:border-emerald-500/20 hover:bg-slate-900/60">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
+                            {index + 1}
+                          </span>
+                          <span className="text-sm text-slate-300">{action}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Why Was This Flagged - For Malicious/Suspicious Content */}
+                {(results[0]?.classification?.toLowerCase().includes('malicious') || 
+                  results[0]?.classification?.toLowerCase().includes('suspicious')) && 
+                  results[0]?.breakdown?.flagged_reason && (
+                  <div className="rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-orange-500/5 p-6">
+                    <h3 className="mb-4 text-lg font-semibold text-white flex items-center gap-2">
+                      <svg className="h-5 w-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Why Was This Flagged?
+                    </h3>
+                    <div className="space-y-2">
+                      {results[0].breakdown.flagged_reason.split(' • ').map((reason, index) => (
+                        <div key={index} className="flex items-start gap-3">
+                          <span className="mt-1 flex h-1.5 w-1.5 rounded-full bg-yellow-400" />
+                          <p className="text-sm text-slate-300">{reason}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Action Buttons */}
                 <div className="flex gap-3">
                   <Link
@@ -609,13 +770,14 @@ export default function HomePage() {
         <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
           {/* Quick Submit */}
           <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-6 shadow-2xl shadow-black/30">
-            <h2 className="mb-4 text-xl font-semibold text-white">Quick Analysis</h2>
+            <h2 className="mb-4 text-xl font-semibold text-white">Vulnerability Shield Level</h2>
             <IntakeForm
               onSubmit={handleSubmitIntake}
               isSubmitting={isSubmitting}
               onValidationError={(message) =>
                 setToast({ message, tone: "error" })
               }
+              userRole={user?.role}
             />
           </div>
 

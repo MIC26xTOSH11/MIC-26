@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useAuth } from "@/lib/auth";
 import { listCases, createEventStream, fetchCase } from "@/lib/api";
 import {
   LineChart,
@@ -34,6 +35,7 @@ function bucketizeClassification(value) {
 }
 
 export default function AnalyticsPage() {
+  const { user } = useAuth();
   const [results, setResults] = useState([]);
   const [timeRange, setTimeRange] = useState("7d"); // 24h, 7d, 30d, all
 
@@ -152,6 +154,33 @@ export default function AnalyticsPage() {
       .slice(0, 10)
       .map(([name, value]) => ({ name, value }));
 
+    // Enterprise Analytics - Consumer Vulnerability Risk breakdown
+    const vulnerabilityRisk = {
+      youth: 0,
+      general: 0,
+      vulnerable: 0,
+      elderly: 0,
+    };
+    filtered.forEach((r) => {
+      const risk = r?.breakdown?.consumer_vulnerability_risk;
+      if (risk && vulnerabilityRisk.hasOwnProperty(risk)) {
+        vulnerabilityRisk[risk]++;
+      }
+    });
+
+    // Enterprise Analytics - Most common recommended actions
+    const actionsCount = {};
+    filtered.forEach((r) => {
+      const actions = r?.breakdown?.recommended_actions || [];
+      actions.forEach((action) => {
+        actionsCount[action] = (actionsCount[action] || 0) + 1;
+      });
+    });
+    const topActions = Object.entries(actionsCount)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([name, value]) => ({ name, value }));
+
     // Azure signal averages (when breakdown is available)
     const azureOpenAiScores = [];
     const azureSafetyScores = [];
@@ -178,6 +207,10 @@ export default function AnalyticsPage() {
       dailyTrend: Object.values(dailyData).sort((a, b) => a.date.localeCompare(b.date)),
       scoreDistribution: Object.entries(scoreRanges).map(([name, value]) => ({ name, value })),
       topRegions,
+      vulnerabilityRisk: Object.entries(vulnerabilityRisk)
+        .filter(([, value]) => value > 0)
+        .map(([name, value]) => ({ name, value })),
+      topActions,
       avgScore: filtered.reduce((sum, r) => sum + (r.composite_score || 0), 0) / (filtered.length || 1),
       avgAzureOpenAiRisk,
       avgAzureSafety,
@@ -349,25 +382,27 @@ export default function AnalyticsPage() {
           </ResponsiveContainer>
         </div>
 
-        {/* Platform Breakdown */}
-        <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-6 shadow-2xl shadow-black/30">
-          <h3 className="mb-4 text-lg font-semibold text-white">Platform Sources</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={analytics.platforms} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis type="number" stroke="#94a3b8" tick={{ fill: "#94a3b8" }} />
-              <YAxis dataKey="name" type="category" stroke="#94a3b8" tick={{ fill: "#94a3b8" }} width={80} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1e293b",
-                  border: "1px solid #334155",
-                  borderRadius: "12px",
-                }}
-              />
-              <Bar dataKey="value" fill="#06b6d4" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        {/* Platform Breakdown - Enterprise Only */}
+        {user?.role === 'enterprise' && (
+          <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-6 shadow-2xl shadow-black/30">
+            <h3 className="mb-4 text-lg font-semibold text-white">Platform Sources</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={analytics.platforms} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis type="number" stroke="#94a3b8" tick={{ fill: "#94a3b8" }} />
+                <YAxis dataKey="name" type="category" stroke="#94a3b8" tick={{ fill: "#94a3b8" }} width={80} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#1e293b",
+                    border: "1px solid #334155",
+                    borderRadius: "12px",
+                  }}
+                />
+                <Bar dataKey="value" fill="#06b6d4" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
 
         {/* Top Regions */}
         {analytics.topRegions.length > 0 && (
@@ -386,6 +421,83 @@ export default function AnalyticsPage() {
                   }}
                 />
                 <Bar dataKey="value" fill="#8b5cf6" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Enterprise Analytics - Consumer Vulnerability Risk */}
+        {user?.role === 'enterprise' && analytics.vulnerabilityRisk && analytics.vulnerabilityRisk.length > 0 && (
+          <div className="rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-500/10 to-pink-500/10 p-6 shadow-2xl shadow-purple-500/5">
+            <div className="mb-4 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-white">Consumer Vulnerability Distribution</h3>
+              <span className="px-2 py-0.5 text-xs rounded-full bg-purple-500/30 text-purple-300">Enterprise</span>
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={analytics.vulnerabilityRisk}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, value, percent }) => {
+                    const displayName = name === 'youth' ? 'Youth' : 
+                                       name === 'vulnerable' ? 'Vulnerable' :
+                                       name === 'elderly' ? 'Elderly' : 'General';
+                    return `${displayName}: ${(percent * 100).toFixed(0)}%`;
+                  }}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {analytics.vulnerabilityRisk.map((entry, index) => {
+                    const colors = {
+                      youth: '#fb923c',
+                      general: '#60a5fa',
+                      vulnerable: '#f87171',
+                      elderly: '#a78bfa',
+                    };
+                    return <Cell key={`cell-${index}`} fill={colors[entry.name] || '#94a3b8'} />;
+                  })}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#1e293b",
+                    border: "1px solid #334155",
+                    borderRadius: "12px",
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Enterprise Analytics - Top Recommended Actions */}
+        {user?.role === 'enterprise' && analytics.topActions && analytics.topActions.length > 0 && (
+          <div className="rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 p-6 shadow-2xl shadow-emerald-500/5">
+            <div className="mb-4 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-white">Most Recommended Actions</h3>
+              <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-500/30 text-emerald-300">Enterprise</span>
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={analytics.topActions} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis type="number" stroke="#94a3b8" tick={{ fill: "#94a3b8" }} />
+                <YAxis 
+                  dataKey="name" 
+                  type="category" 
+                  stroke="#94a3b8" 
+                  tick={{ fill: "#94a3b8" }} 
+                  width={150}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#1e293b",
+                    border: "1px solid #334155",
+                    borderRadius: "12px",
+                  }}
+                />
+                <Bar dataKey="value" fill="#10b981" />
               </BarChart>
             </ResponsiveContainer>
           </div>
