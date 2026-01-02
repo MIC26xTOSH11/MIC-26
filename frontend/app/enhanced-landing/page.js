@@ -313,7 +313,10 @@ export default function EnhancedLanding() {
                 { name: 'Anirudha', role: 'Team Member', quote: 'Connecting code with real-world impact.', bio: 'Full-stack developer with strengths in business modeling, product thinking, and end-to-end system development.' }
               ].map((member, i) => (
                 <div key={i} className="warp-element">
-                  <FlipCard className="h-[450px] w-full">
+                  <FlipCard
+                    className="h-[450px] w-full"
+                    flipDirection={i % 2 === 0 ? "horizontal" : "vertical"}
+                  >
                     <FlipCardFront className="rounded-3xl">
                       <div className="h-full p-6 bg-slate-900/30 backdrop-blur-xl border border-white/10 rounded-3xl">
                         <div className="aspect-square rounded-2xl mb-4 overflow-hidden bg-gradient-to-br from-emerald-500 to-cyan-500 relative">

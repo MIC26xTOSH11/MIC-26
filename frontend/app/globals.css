@@ -98,10 +98,6 @@ body {
   transform: translateZ(0);
 }
 
-.animate-scroll-left:hover {
-  animation-play-state: paused;
-}
-
 :root[data-theme="light"] {
   color-scheme: light;
 }
