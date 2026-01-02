@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import Image from "next/image";
+import { FlipCard, FlipCardFront, FlipCardBack } from "@/components/ui/flip-card";
 
 type TeamMember = {
   id: number;
@@ -58,22 +59,6 @@ interface TeamGridProps {
 }
 
 export default function TeamGrid({ className = "" }: TeamGridProps) {
-  const [hoveredId, setHoveredId] = useState<number | null>(null);
-
-  const overlayVariants = {
-    hidden: {
-      opacity: 0,
-      y: 20,
-    },
-    visible: {
-      opacity: 1,
-      y: 0,
-    },
-    exit: {
-      opacity: 0,
-      y: 20,
-    },
-  };
 
   return (
     <section className={`relative py-20 lg:py-32 ${className}`}>
@@ -101,158 +86,134 @@ export default function TeamGrid({ className = "" }: TeamGridProps) {
           <div className="flex gap-6 lg:gap-8 animate-scroll-left hover:[animation-play-state:paused]">
             {/* First set of cards */}
             {teamMembers.map((member) => (
-              <motion.div
+              <div
                 key={`first-${member.id}`}
-                className="relative group flex-shrink-0 w-[280px] sm:w-[320px]"
-                whileHover={{ scale: 1.05 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                onHoverStart={() => setHoveredId(member.id)}
-                onHoverEnd={() => setHoveredId(null)}
-                onTouchStart={() => setHoveredId(hoveredId === member.id ? null : member.id)}
-                aria-expanded={hoveredId === member.id}
+                className="flex-shrink-0 w-[280px] sm:w-[320px]"
               >
-                {/* Base Card */}
-                <div className="relative p-6 bg-gradient-to-br from-teal-500/20 via-emerald-500/20 to-green-500/20 backdrop-blur-xl border border-white/10 rounded-lg shadow-lg hover:border-emerald-400/50 transition-all duration-500 overflow-hidden">
-                  {/* Team Member Photo */}
-                  <div className="aspect-square rounded-2xl mb-4 overflow-hidden bg-gradient-to-br from-emerald-500 to-cyan-500 relative">
-                    {member.imageSrc ? (
-                      <Image
-                        src={member.imageSrc}
-                        alt={member.name}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-5xl font-bold text-white">
-                        {member.initial}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Name & Role */}
-                  <h3 className="text-2xl font-semibold mb-1 text-white">
-                    {member.name}
-                  </h3>
-                  <p className="text-slate-400">{member.role}</p>
-
-                  {/* Hover Preview Overlay */}
-                  <AnimatePresence>
-                    {hoveredId === member.id && (
-                      <motion.div
-                        className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center p-6 rounded-lg"
-                        variants={overlayVariants}
-                        initial="hidden"
-                        animate="visible"
-                        exit="exit"
-                        transition={{
-                          duration: 0.3,
-                          ease: "easeOut",
-                        }}
-                      >
-                        {/* Avatar Image */}
-                        {member.imageSrc && (
-                          <div className="w-20 h-20 rounded-full overflow-hidden mb-4 border-2 border-emerald-400 shadow-lg relative">
-                            <Image
-                              src={member.imageSrc}
-                              alt={member.name}
-                              fill
-                              className="object-cover"
-                            />
+                <FlipCard className="h-[450px] w-full">
+                  <FlipCardFront className="rounded-lg">
+                    <div className="h-full p-6 bg-gradient-to-br from-teal-500/20 via-emerald-500/20 to-green-500/20 backdrop-blur-xl border border-white/10 rounded-lg shadow-lg">
+                      {/* Team Member Photo */}
+                      <div className="aspect-square rounded-2xl mb-4 overflow-hidden bg-gradient-to-br from-emerald-500 to-cyan-500 relative">
+                        {member.imageSrc ? (
+                          <Image
+                            src={member.imageSrc}
+                            alt={member.name}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-5xl font-bold text-white">
+                            {member.initial}
                           </div>
                         )}
+                      </div>
 
-                        {/* Quote */}
-                        <p className="text-lg italic text-emerald-300 mb-3 text-center font-medium">
-                          "{member.quote}"
-                        </p>
+                      {/* Name & Role */}
+                      <h3 className="text-2xl font-semibold mb-1 text-white">
+                        {member.name}
+                      </h3>
+                      <p className="text-slate-400">{member.role}</p>
+                    </div>
+                  </FlipCardFront>
 
-                        {/* Bio */}
-                        <p className="text-sm text-slate-300 text-center leading-relaxed">
-                          {member.bio}
-                        </p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </motion.div>
+                  <FlipCardBack className="rounded-lg">
+                    <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-emerald-500/20 via-cyan-500/20 to-teal-500/20 backdrop-blur-xl border border-emerald-400/50 rounded-lg">
+                      {/* Avatar Image */}
+                      <div className="w-20 h-20 rounded-full overflow-hidden mb-4 border-2 border-emerald-400 shadow-lg bg-gradient-to-br from-emerald-500 to-cyan-500 relative">
+                        {member.imageSrc ? (
+                          <Image
+                            src={member.imageSrc}
+                            alt={member.name}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-white">
+                            {member.initial}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Quote */}
+                      <p className="text-lg italic text-emerald-300 mb-4 text-center font-medium">
+                        "{member.quote}"
+                      </p>
+
+                      {/* Bio */}
+                      <p className="text-sm text-slate-300 text-center leading-relaxed">
+                        {member.bio}
+                      </p>
+                    </div>
+                  </FlipCardBack>
+                </FlipCard>
+              </div>
             ))}
             
             {/* Duplicate set for seamless loop */}
             {teamMembers.map((member) => (
-              <motion.div
+              <div
                 key={`second-${member.id}`}
-                className="relative group flex-shrink-0 w-[280px] sm:w-[320px]"
-                whileHover={{ scale: 1.05 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                onHoverStart={() => setHoveredId(member.id)}
-                onHoverEnd={() => setHoveredId(null)}
-                onTouchStart={() => setHoveredId(hoveredId === member.id ? null : member.id)}
-                aria-expanded={hoveredId === member.id}
+                className="flex-shrink-0 w-[280px] sm:w-[320px]"
               >
-                {/* Base Card */}
-                <div className="relative p-6 bg-gradient-to-br from-teal-500/20 via-emerald-500/20 to-green-500/20 backdrop-blur-xl border border-white/10 rounded-lg shadow-lg hover:border-emerald-400/50 transition-all duration-500 overflow-hidden">
-                  {/* Team Member Photo */}
-                  <div className="aspect-square rounded-2xl mb-4 overflow-hidden bg-gradient-to-br from-emerald-500 to-cyan-500 relative">
-                    {member.imageSrc ? (
-                      <Image
-                        src={member.imageSrc}
-                        alt={member.name}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-5xl font-bold text-white">
-                        {member.initial}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Name & Role */}
-                  <h3 className="text-2xl font-semibold mb-1 text-white">
-                    {member.name}
-                  </h3>
-                  <p className="text-slate-400">{member.role}</p>
-
-                  {/* Hover Preview Overlay */}
-                  <AnimatePresence>
-                    {hoveredId === member.id && (
-                      <motion.div
-                        className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center p-6 rounded-lg"
-                        variants={overlayVariants}
-                        initial="hidden"
-                        animate="visible"
-                        exit="exit"
-                        transition={{
-                          duration: 0.3,
-                          ease: "easeOut",
-                        }}
-                      >
-                        {/* Avatar Image */}
-                        {member.imageSrc && (
-                          <div className="w-20 h-20 rounded-full overflow-hidden mb-4 border-2 border-emerald-400 shadow-lg relative">
-                            <Image
-                              src={member.imageSrc}
-                              alt={member.name}
-                              fill
-                              className="object-cover"
-                            />
+                <FlipCard className="h-[450px] w-full">
+                  <FlipCardFront className="rounded-lg">
+                    <div className="h-full p-6 bg-gradient-to-br from-teal-500/20 via-emerald-500/20 to-green-500/20 backdrop-blur-xl border border-white/10 rounded-lg shadow-lg">
+                      {/* Team Member Photo */}
+                      <div className="aspect-square rounded-2xl mb-4 overflow-hidden bg-gradient-to-br from-emerald-500 to-cyan-500 relative">
+                        {member.imageSrc ? (
+                          <Image
+                            src={member.imageSrc}
+                            alt={member.name}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-5xl font-bold text-white">
+                            {member.initial}
                           </div>
                         )}
+                      </div>
 
-                        {/* Quote */}
-                        <p className="text-lg italic text-emerald-300 mb-3 text-center font-medium">
-                          "{member.quote}"
-                        </p>
+                      {/* Name & Role */}
+                      <h3 className="text-2xl font-semibold mb-1 text-white">
+                        {member.name}
+                      </h3>
+                      <p className="text-slate-400">{member.role}</p>
+                    </div>
+                  </FlipCardFront>
 
-                        {/* Bio */}
-                        <p className="text-sm text-slate-300 text-center leading-relaxed">
-                          {member.bio}
-                        </p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </motion.div>
+                  <FlipCardBack className="rounded-lg">
+                    <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-emerald-500/20 via-cyan-500/20 to-teal-500/20 backdrop-blur-xl border border-emerald-400/50 rounded-lg">
+                      {/* Avatar Image */}
+                      <div className="w-20 h-20 rounded-full overflow-hidden mb-4 border-2 border-emerald-400 shadow-lg bg-gradient-to-br from-emerald-500 to-cyan-500 relative">
+                        {member.imageSrc ? (
+                          <Image
+                            src={member.imageSrc}
+                            alt={member.name}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-white">
+                            {member.initial}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Quote */}
+                      <p className="text-lg italic text-emerald-300 mb-4 text-center font-medium">
+                        "{member.quote}"
+                      </p>
+
+                      {/* Bio */}
+                      <p className="text-sm text-slate-300 text-center leading-relaxed">
+                        {member.bio}
+                      </p>
+                    </div>
+                  </FlipCardBack>
+                </FlipCard>
+              </div>
             ))}
           </div>
         </div>

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import BlobCanvas from "@/components/BlobCanvas";
 import HexGrid from "@/components/HexGrid";
 import WebGLOrbs from "@/components/WebGLOrbs";
+import { FlipCard, FlipCardFront, FlipCardBack } from "@/components/ui/flip-card";
 import {
   Menu,
   X,
@@ -306,22 +307,41 @@ export default function EnhancedLanding() {
 
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
               {[
-                { name: 'Omar', role: 'Team Lead' },
-                { name: 'Tanishq', role: 'Team Member' },
-                { name: 'Hansika', role: 'Team Member' },
-                { name: 'Anirudha', role: 'Team Member' }
+                { name: 'Omar', role: 'Team Lead', quote: 'Building systems that think before they act.', bio: 'AI/ML engineer and systems thinker, focused on security, detection pipelines, and scalable backend design.' },
+                { name: 'Tanishq', role: 'Team Member', quote: 'Engineering intelligence from models to machines.', bio: 'ML engineer with strong DevOps skills, working across model training, deployment, and infrastructure automation.' },
+                { name: 'Hansika', role: 'Team Member', quote: 'Designing clarity where complexity lives.', bio: 'Graphic designer and UI/UX specialist, focused on clean interfaces, visual storytelling, and user-centered design.' },
+                { name: 'Anirudha', role: 'Team Member', quote: 'Connecting code with real-world impact.', bio: 'Full-stack developer with strengths in business modeling, product thinking, and end-to-end system development.' }
               ].map((member, i) => (
-                <div
-                  key={i}
-                  className="warp-element group p-6 bg-slate-900/30 backdrop-blur-xl border border-white/10 rounded-3xl hover:border-emerald-400/50 transition-all duration-500 hover:scale-105"
-                >
-                  <div className="aspect-square rounded-2xl mb-4 overflow-hidden bg-gradient-to-br from-emerald-500 to-cyan-500 relative">
-                    <div className="absolute inset-0 flex items-center justify-center text-4xl font-bold text-white">
-                      {member.name[0]}
-                    </div>
-                  </div>
-                  <h3 className="text-2xl font-semibold mb-1 text-white">{member.name}</h3>
-                  <p className="text-slate-400">{member.role}</p>
+                <div key={i} className="warp-element">
+                  <FlipCard className="h-[450px] w-full">
+                    <FlipCardFront className="rounded-3xl">
+                      <div className="h-full p-6 bg-slate-900/30 backdrop-blur-xl border border-white/10 rounded-3xl">
+                        <div className="aspect-square rounded-2xl mb-4 overflow-hidden bg-gradient-to-br from-emerald-500 to-cyan-500 relative">
+                          <div className="absolute inset-0 flex items-center justify-center text-4xl font-bold text-white">
+                            {member.name[0]}
+                          </div>
+                        </div>
+                        <h3 className="text-2xl font-semibold mb-1 text-white">{member.name}</h3>
+                        <p className="text-slate-400">{member.role}</p>
+                      </div>
+                    </FlipCardFront>
+                    
+                    <FlipCardBack className="rounded-3xl">
+                      <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-emerald-500/20 via-cyan-500/20 to-teal-500/20 backdrop-blur-xl border border-emerald-400/50 rounded-3xl">
+                        <div className="w-20 h-20 rounded-full overflow-hidden mb-4 border-2 border-emerald-400 shadow-lg bg-gradient-to-br from-emerald-500 to-cyan-500">
+                          <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-white">
+                            {member.name[0]}
+                          </div>
+                        </div>
+                        <p className="text-lg italic text-emerald-300 mb-4 text-center font-medium">
+                          "{member.quote}"
+                        </p>
+                        <p className="text-sm text-slate-300 text-center leading-relaxed">
+                          {member.bio}
+                        </p>
+                      </div>
+                    </FlipCardBack>
+                  </FlipCard>
                 </div>
               ))}
             </div>
