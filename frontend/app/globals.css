@@ -54,8 +54,16 @@
   --color-text-primary-rgb: 199, 209, 219;
 }
 
+html {
+  overscroll-behavior: none;
+  overflow-x: hidden;
+}
+
 body {
   @apply bg-slate-950 text-slate-100 antialiased;
+  overscroll-behavior: none;
+  position: relative;
+  overflow-x: hidden;
 }
 
 /* Animation for latest result */
