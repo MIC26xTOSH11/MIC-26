@@ -82,6 +82,25 @@ body {
   animation: fadeIn 0.5s ease-out forwards;
 }
 
+/* Continuous horizontal scroll animation for team cards */
+@keyframes scroll-left {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(calc(-100% / 2));
+  }
+}
+
+.animate-scroll-left {
+  animation: scroll-left 25s linear infinite;
+  will-change: transform;
+}
+
+.animate-scroll-left:hover {
+  animation-play-state: paused;
+}
+
 :root[data-theme="light"] {
   color-scheme: light;
 }
