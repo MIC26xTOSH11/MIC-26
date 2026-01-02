@@ -124,7 +124,7 @@ const LoginComponent = () => {
       localStorage.setItem('username', data.username);
       localStorage.setItem('role', data.role);
 
-      if (data.role === 'enterprise' || data.role === 'superuser') {
+      if (data.role === 'superuser') {
         window.location.href = '/superuser';
       } else {
         window.location.href = '/dashboard';
