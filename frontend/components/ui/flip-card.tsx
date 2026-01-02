@@ -7,13 +7,13 @@ import { cn } from "@/lib/utils"
 
 const TRANSITION_CONFIG = {
   duration: 0.6,
-  ease: [0.34, 1.56, 0.64, 1],
+  easing: "cubic-bezier(0.34, 1.56, 0.64, 1)",
   transition: "0.6s cubic-bezier(0.34, 1.56, 0.64, 1)",
 } as const
 
 const HOVER_SCALE_CONFIG = {
   duration: 0.4,
-  ease: [0.4, 0, 0.2, 1],
+  easing: "cubic-bezier(0.4, 0, 0.2, 1)",
 }
 
 const TRANSFORM_STYLES: React.CSSProperties = {
@@ -108,7 +108,7 @@ const FlipCard = React.memo(
             role="button"
             tabIndex={disabled ? -1 : 0}
             aria-pressed={isFlipped}
-            {...props}
+            {...(props as any)}
           />
         </FlipCardContext.Provider>
       )
@@ -147,7 +147,7 @@ const FlipCardFront = React.memo(
             transform: "translateZ(0)",
             ...props.style,
           }}
-          {...props}
+          {...(props as any)}
         />
       )
     }
@@ -182,7 +182,7 @@ const FlipCardBack = React.memo(
             transform: "translateZ(0)",
             ...props.style,
           }}
-          {...props}
+          {...(props as any)}
         />
       )
     }
