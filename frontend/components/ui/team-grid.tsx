@@ -58,14 +58,15 @@ interface TeamGridProps {
 }
 
 export default function TeamGrid({ className = "" }: TeamGridProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const setRef = useRef<HTMLDivElement | null>(null);
-  const isHoveringRef = useRef(false);
 
   useEffect(() => {
+    const containerEl = containerRef.current;
     const trackEl = trackRef.current;
     const setEl = setRef.current;
-    if (!trackEl || !setEl) return;
+    if (!containerEl || !trackEl || !setEl) return;
 
     let rafId = 0;
     let lastTs = 0;
@@ -82,18 +83,30 @@ export default function TeamGrid({ className = "" }: TeamGridProps) {
     ro?.observe(setEl);
 
     // Tuned for a smooth, “professional” marquee.
-    const BASE_SPEED_PX_S = 46;
-    const HOVER_SPEED_PX_S = 22;
+    const BASE_SPEED_PX_S = 54;
+    const HOVER_SPEED_PX_S = 26;
     const SPEED_SMOOTHING = 10; // higher = faster response
 
     let currentSpeed = BASE_SPEED_PX_S;
+
+    const isCardHovered = () => {
+      // Stable even while items move (no enter/leave churn).
+      return containerEl.querySelector('[data-team-card]:hover') !== null;
+    };
+
+    const onVisibilityChange = () => {
+      // Avoid a big dt spike after tab switches (looks like a “jump/back”).
+      lastTs = 0;
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     const tick = (ts: number) => {
       if (!lastTs) lastTs = ts;
       const dt = Math.min(0.05, (ts - lastTs) / 1000);
       lastTs = ts;
 
-      const targetSpeed = isHoveringRef.current ? HOVER_SPEED_PX_S : BASE_SPEED_PX_S;
+      const targetSpeed = isCardHovered() ? HOVER_SPEED_PX_S : BASE_SPEED_PX_S;
       const alpha = 1 - Math.exp(-SPEED_SMOOTHING * dt);
       currentSpeed = currentSpeed + (targetSpeed - currentSpeed) * alpha;
 
@@ -112,6 +125,7 @@ export default function TeamGrid({ className = "" }: TeamGridProps) {
     return () => {
       cancelAnimationFrame(rafId);
       ro?.disconnect();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 
@@ -137,7 +151,7 @@ export default function TeamGrid({ className = "" }: TeamGridProps) {
         </div>
 
         {/* Team Grid - Horizontal Scrolling */}
-        <div className="relative overflow-hidden">
+        <div ref={containerRef} className="relative overflow-hidden">
           <div
             ref={trackRef}
             className="flex will-change-transform"
@@ -148,12 +162,7 @@ export default function TeamGrid({ className = "" }: TeamGridProps) {
                 <div
                   key={`first-${member.id}`}
                   className="flex-shrink-0 w-[280px] sm:w-[320px]"
-                  onMouseEnter={() => {
-                    isHoveringRef.current = true;
-                  }}
-                  onMouseLeave={() => {
-                    isHoveringRef.current = false;
-                  }}
+                  data-team-card
                 >
                   <FlipCard
                     className="h-[450px] w-full"
@@ -219,12 +228,7 @@ export default function TeamGrid({ className = "" }: TeamGridProps) {
                 <div
                   key={`second-${member.id}`}
                   className="flex-shrink-0 w-[280px] sm:w-[320px]"
-                  onMouseEnter={() => {
-                    isHoveringRef.current = true;
-                  }}
-                  onMouseLeave={() => {
-                    isHoveringRef.current = false;
-                  }}
+                  data-team-card
                 >
                   <FlipCard
                     className="h-[450px] w-full"
