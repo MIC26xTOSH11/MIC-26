@@ -114,7 +114,7 @@ export default function LandingPage() {
   return (
     <div
       ref={mainRef}
-      className="relative min-h-screen overflow-x-hidden"
+      className="relative min-h-screen overflow-hidden"
       style={{
         background: `linear-gradient(135deg, 
           hsl(${gradientHue}, 30%, 8%) 0%, 
@@ -123,8 +123,7 @@ export default function LandingPage() {
       }}
     >
       {/* Animated Background Layers */}
-      <BlobCanvas />
-      <HexGrid />
+
       <WebGLOrbs isMenuOpen={menuOpen} />
 
       {/* Cosmic Background Effect */}
