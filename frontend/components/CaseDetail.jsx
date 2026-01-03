@@ -92,7 +92,7 @@ export default function CaseDetail({
   }, [graphCommunities]);
 
   // Build explainability bullet points from available data
-  // NOTE: This must be before the early return to follow React hooks rules
+  // NOTE: This must be beforae the early return to follow React hooks rules
   const explainabilityPoints = useMemo(() => {
     if (!caseData) return [];
     const points = [];
