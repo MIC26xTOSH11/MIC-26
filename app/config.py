@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     app_name: str = "LLM MalignOps Shield"
     environment: str = Field("dev", env="APP_ENV")
     secret_key: str = Field("super-secret-key", env="APP_SECRET")
-    database_url: str = Field("sqlite:///./data/app.db", env="DATABASE_URL")
+    database_url: str = Field("",env="DATABASE_URL",)
     allowed_origins: List[str] = Field(default_factory=lambda: ["*"])
     sharing_allowed_regions: List[str] = Field(
         default_factory=lambda: ["USA", "EU", "IN", "AUS"]
@@ -42,11 +42,6 @@ class Settings(BaseSettings):
     azure_language_key: str = Field("", env="AZURE_LANGUAGE_KEY")
     azure_language_enabled: bool = Field(True, env="AZURE_LANGUAGE_ENABLED")
     
-    # Blockchain, sharing, and image analysis features removed - focusing on text disinformation MVP
-    # federated_encryption_key, federated_nodes, node_url removed
-    # sightengine_api_user, sightengine_api_secret removed
-
-
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()

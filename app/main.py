@@ -186,10 +186,9 @@ def detect_location_from_ip(ip_address: str) -> dict:
 @app.on_event("startup")
 async def startup_event():
     """Ensure database is initialized on startup."""
-    # Database init is already called in Database.__init__, but we verify it here
-    # to surface any errors early
+    # Drop and recreate schema once per boot to satisfy "clean start" requirement.
     try:
-        database_l1._initialise()
+        database_l1.reset_schema(force=True)
     except Exception as e:
         print(f"Database initialization warning: {e}")
 

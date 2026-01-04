@@ -1,91 +1,118 @@
 import hashlib
 import json
-import sqlite3
-from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+from sqlalchemy import (
+    Column,
+    Float,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    Text,
+    create_engine,
+    select,
+)
+from sqlalchemy.engine import Engine
+from sqlalchemy.exc import IntegrityError
 
 from ..config import get_settings
 
 
 class Database:
+    """Lightweight data access layer with SQLite fallback and Azure SQL/MySQL support."""
+
     def __init__(self) -> None:
         settings = get_settings()
-        self.path = settings.database_url.replace("sqlite:///", "")
-        Path(self.path).parent.mkdir(parents=True, exist_ok=True)
-        self._initialise()
+        self.database_url = settings.database_url
+        self.is_sqlite = self.database_url.startswith("sqlite")
 
-    def _initialise(self) -> None:
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS cases (
-                    intake_id TEXT PRIMARY KEY,
-                    raw_text TEXT NOT NULL,
-                    classification TEXT NOT NULL,
-                    composite_score REAL NOT NULL,
-                    metadata_json TEXT,
-                    breakdown_json TEXT,
-                    provenance_json TEXT,
-                    summary_text TEXT,
-                    decision_reason TEXT,
-                    created_at TEXT NOT NULL
-                )
-            """
-            )
-            cur.execute("PRAGMA table_info(cases)")
-            columns = {row[1] for row in cur.fetchall()}
-            if "summary_text" not in columns:
-                cur.execute("ALTER TABLE cases ADD COLUMN summary_text TEXT")
-            if "decision_reason" not in columns:
-                cur.execute("ALTER TABLE cases ADD COLUMN decision_reason TEXT")
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS audit_log (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    intake_id TEXT,
-                    action TEXT NOT NULL,
-                    actor TEXT NOT NULL,
-                    payload TEXT,
-                    created_at TEXT NOT NULL
-                )
-            """
-            )
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS fingerprints (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    intake_id TEXT NOT NULL,
-                    content_hash TEXT NOT NULL,
-                    normalized_hash TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                )
-            """
-            )
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    role TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    last_login TEXT
-                )
-            """
-            )
+        # Ensure local SQLite directory exists so the app can start cleanly.
+        if self.is_sqlite:
+            path = self.database_url.replace("sqlite:///", "")
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
 
-    @contextmanager
-    def _cursor(self):
-        conn = sqlite3.connect(self.path)
-        try:
-            cur = conn.cursor()
-            yield cur
-            conn.commit()
-        finally:
-            conn.close()
+        self.engine: Engine = create_engine(
+            self.database_url,
+            future=True,
+            pool_pre_ping=True,
+        )
 
+        self.metadata = MetaData()
+        self._define_tables()
+
+        # Defer schema drop/create until explicitly requested (e.g., at app startup)
+        # to avoid wiping twice when multiple Database instances are created.
+        self._schema_initialized = False
+
+    # ---------------------- Table Definitions ----------------------
+    def _define_tables(self) -> None:
+        self.cases = Table(
+            "cases",
+            self.metadata,
+            Column("intake_id", String(255), primary_key=True),
+            Column("raw_text", Text, nullable=False),
+            Column("classification", String(100), nullable=False),
+            Column("composite_score", Float, nullable=False),
+            Column("metadata_json", Text),
+            Column("breakdown_json", Text),
+            Column("provenance_json", Text),
+            Column("summary_text", Text),
+            Column("decision_reason", Text),
+            Column("created_at", String(50), nullable=False),
+        )
+
+        self.audit_log = Table(
+            "audit_log",
+            self.metadata,
+            Column("id", Integer, primary_key=True, autoincrement=True),
+            Column("intake_id", String(255)),
+            Column("action", String(100), nullable=False),
+            Column("actor", String(100), nullable=False),
+            Column("payload", Text),
+            Column("created_at", String(50), nullable=False),
+        )
+
+        self.fingerprints = Table(
+            "fingerprints",
+            self.metadata,
+            Column("id", Integer, primary_key=True, autoincrement=True),
+            Column("intake_id", String(255), nullable=False),
+            Column("content_hash", String(255), nullable=False),
+            Column("normalized_hash", String(255), nullable=False),
+            Column("created_at", String(50), nullable=False),
+        )
+
+        self.users = Table(
+            "users",
+            self.metadata,
+            Column("id", Integer, primary_key=True, autoincrement=True),
+            Column("username", String(255), nullable=False, unique=True),
+            Column("password_hash", String(255), nullable=False),
+            Column("role", String(50), nullable=False),
+            Column("created_at", String(50), nullable=False),
+            Column("last_login", String(50)),
+        )
+
+    def reset_schema(self, force: bool = False) -> None:
+        """Drop and recreate all tables. Idempotent unless force=True."""
+        if self._schema_initialized and not force:
+            return
+        self.metadata.drop_all(self.engine)
+        self.metadata.create_all(self.engine)
+        self._schema_initialized = True
+
+    # ---------------------- Helpers ----------------------
+    def _now(self) -> str:
+        return datetime.utcnow().isoformat()
+
+    def _normalize_text(self, text: str) -> str:
+        # Simple normalization for fuzzy match: lowercase and collapse whitespace
+        return "".join(text.lower().split())
+
+    # ---------------------- Case Management ----------------------
     def save_case(
         self,
         intake_id: str,
@@ -98,247 +125,234 @@ class Database:
         summary: Optional[str] = None,
         decision_reason: Optional[str] = None,
     ) -> None:
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                INSERT OR REPLACE INTO cases (
-                    intake_id,
-                    raw_text,
-                    classification,
-                    composite_score,
-                    metadata_json,
-                    breakdown_json,
-                    provenance_json,
-                    summary_text,
-                    decision_reason,
-                    created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-                (
-                    intake_id,
-                    raw_text,
-                    classification,
-                    composite_score,
-                    json.dumps(metadata),
-                    json.dumps(breakdown),
-                    json.dumps(provenance),
-                    summary,
-                    decision_reason,
-                    datetime.utcnow().isoformat(),
-                ),
-            )
+        payload = {
+            "raw_text": raw_text,
+            "classification": classification,
+            "composite_score": composite_score,
+            "metadata_json": json.dumps(metadata),
+            "breakdown_json": json.dumps(breakdown),
+            "provenance_json": json.dumps(provenance),
+            "summary_text": summary,
+            "decision_reason": decision_reason,
+            "created_at": self._now(),
+        }
 
-    def _normalize_text(self, text: str) -> str:
-        # simple normalization for fuzzy match: lowercase and collapse whitespace
-        return "".join(text.lower().split())
+        with self.engine.begin() as conn:
+            existing = conn.execute(
+                select(self.cases.c.intake_id).where(self.cases.c.intake_id == intake_id)
+            ).scalar_one_or_none()
 
+            if existing:
+                conn.execute(
+                    self.cases.update().where(self.cases.c.intake_id == intake_id).values(**payload)
+                )
+            else:
+                conn.execute(self.cases.insert().values(intake_id=intake_id, **payload))
+
+    # ---------------------- Fingerprints ----------------------
     def store_fingerprint(self, intake_id: str, text: str, content_hash: str) -> None:
         normalized_hash = hashlib.sha256(self._normalize_text(text).encode("utf-8")).hexdigest()
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO fingerprints (intake_id, content_hash, normalized_hash, created_at)
-                VALUES (?, ?, ?, ?)
-            """,
-                (intake_id, content_hash, normalized_hash, datetime.utcnow().isoformat()),
+        with self.engine.begin() as conn:
+            conn.execute(
+                self.fingerprints.insert().values(
+                    intake_id=intake_id,
+                    content_hash=content_hash,
+                    normalized_hash=normalized_hash,
+                    created_at=self._now(),
+                )
             )
 
     def check_fingerprint(self, text: str) -> list[Dict[str, Any]]:
         normalized_hash = hashlib.sha256(self._normalize_text(text).encode("utf-8")).hexdigest()
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                SELECT intake_id, content_hash, normalized_hash, created_at
-                FROM fingerprints
-                WHERE normalized_hash = ? OR content_hash = ?
-            """,
-                (normalized_hash, normalized_hash),
-            )
-            rows = cur.fetchall() or []
-            return [
-                {
-                    "intake_id": r[0],
-                    "content_hash": r[1],
-                    "normalized_hash": r[2],
-                    "created_at": r[3],
-                }
-                for r in rows
-            ]
+        with self.engine.begin() as conn:
+            rows = conn.execute(
+                select(
+                    self.fingerprints.c.intake_id,
+                    self.fingerprints.c.content_hash,
+                    self.fingerprints.c.normalized_hash,
+                    self.fingerprints.c.created_at,
+                ).where(
+                    (self.fingerprints.c.normalized_hash == normalized_hash)
+                    | (self.fingerprints.c.content_hash == normalized_hash)
+                )
+            ).all()
 
-    def fetch_case(self, intake_id: str) -> Optional[Dict[str, Any]]:
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                SELECT
-                    raw_text,
-                    classification,
-                    composite_score,
-                    metadata_json,
-                    breakdown_json,
-                    provenance_json,
-                    summary_text,
-                    decision_reason,
-                    created_at
-                FROM cases WHERE intake_id=?
-            """,
-                (intake_id,),
-            )
-            row = cur.fetchone()
-            if not row:
-                return None
-            metadata_json = json.loads(row[3]) if row[3] else {}
-            breakdown = json.loads(row[4]) if row[4] else {}
-            provenance = json.loads(row[5]) if row[5] else {}
-            return {
-                "raw_text": row[0],
-                "classification": row[1],
-                "composite_score": row[2],
-                "metadata": metadata_json,
-                "breakdown": breakdown,
-                "provenance": provenance,
-                "summary": row[6],
-                "decision_reason": row[7],
-                "created_at": row[8],
+        return [
+            {
+                "intake_id": r.intake_id,
+                "content_hash": r.content_hash,
+                "normalized_hash": r.normalized_hash,
+                "created_at": r.created_at,
             }
+            for r in rows
+        ]
+
+    # ---------------------- Case Retrieval & Audit ----------------------
+    def fetch_case(self, intake_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(
+                    self.cases.c.raw_text,
+                    self.cases.c.classification,
+                    self.cases.c.composite_score,
+                    self.cases.c.metadata_json,
+                    self.cases.c.breakdown_json,
+                    self.cases.c.provenance_json,
+                    self.cases.c.summary_text,
+                    self.cases.c.decision_reason,
+                    self.cases.c.created_at,
+                ).where(self.cases.c.intake_id == intake_id)
+            ).one_or_none()
+
+        if not row:
+            return None
+
+        metadata_json = json.loads(row.metadata_json) if row.metadata_json else {}
+        breakdown = json.loads(row.breakdown_json) if row.breakdown_json else {}
+        provenance = json.loads(row.provenance_json) if row.provenance_json else {}
+
+        return {
+            "raw_text": row.raw_text,
+            "classification": row.classification,
+            "composite_score": row.composite_score,
+            "metadata": metadata_json,
+            "breakdown": breakdown,
+            "provenance": provenance,
+            "summary": row.summary_text,
+            "decision_reason": row.decision_reason,
+            "created_at": row.created_at,
+        }
 
     def log_action(self, intake_id: str, action: str, actor: str, payload: Dict[str, Any]):
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO audit_log (intake_id, action, actor, payload, created_at)
-                VALUES (?, ?, ?, ?, ?)
-            """,
-                (
-                    intake_id,
-                    action,
-                    actor,
-                    json.dumps(payload),
-                    datetime.utcnow().isoformat(),
-                ),
+        with self.engine.begin() as conn:
+            conn.execute(
+                self.audit_log.insert().values(
+                    intake_id=intake_id,
+                    action=action,
+                    actor=actor,
+                    payload=json.dumps(payload),
+                    created_at=self._now(),
+                )
             )
 
     def get_audit_trail(self, intake_id: str) -> list[Dict[str, Any]]:
         """Retrieve immutable audit trail for a case."""
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                SELECT id, action, actor, payload, created_at
-                FROM audit_log
-                WHERE intake_id = ?
-                ORDER BY created_at ASC
-            """,
-                (intake_id,),
-            )
-            rows = cur.fetchall() or []
-            return [
-                {
-                    "id": r[0],
-                    "action": r[1],
-                    "actor": r[2],
-                    "payload": json.loads(r[3]) if r[3] else {},
-                    "created_at": r[4],
-                }
-                for r in rows
-            ]
+        with self.engine.begin() as conn:
+            rows = conn.execute(
+                select(
+                    self.audit_log.c.id,
+                    self.audit_log.c.action,
+                    self.audit_log.c.actor,
+                    self.audit_log.c.payload,
+                    self.audit_log.c.created_at,
+                )
+                .where(self.audit_log.c.intake_id == intake_id)
+                .order_by(self.audit_log.c.created_at.asc())
+            ).all()
+
+        return [
+            {
+                "id": r.id,
+                "action": r.action,
+                "actor": r.actor,
+                "payload": json.loads(r.payload) if r.payload else {},
+                "created_at": r.created_at,
+            }
+            for r in rows
+        ]
 
     def list_cases(self, limit: int = 50) -> list[Dict[str, Any]]:
         """List recent cases for dashboard."""
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                SELECT
-                    intake_id,
-                    classification,
-                    composite_score,
-                    summary_text,
-                    created_at,
-                    metadata_json,
-                    breakdown_json
-                FROM cases
-                ORDER BY created_at DESC
-                LIMIT ?
-            """,
-                (limit,),
-            )
-            rows = cur.fetchall() or []
-            return [
-                (lambda metadata, breakdown: {
-                    "intake_id": r[0],
-                    "classification": r[1],
-                    "composite_score": r[2],
-                    "summary": r[3],
-                    # Expose created_at under both created_at and submitted_at
-                    # so it matches the DetectionResult-like shape used by the frontend.
-                    "created_at": r[4],
-                    "submitted_at": r[4],
-                    # Include parsed JSON blobs so the frontend can render Azure + language signals
-                    # without having to hydrate every row via /cases/{id}.
+        with self.engine.begin() as conn:
+            rows = conn.execute(
+                select(
+                    self.cases.c.intake_id,
+                    self.cases.c.classification,
+                    self.cases.c.composite_score,
+                    self.cases.c.summary_text,
+                    self.cases.c.created_at,
+                    self.cases.c.metadata_json,
+                    self.cases.c.breakdown_json,
+                )
+                .order_by(self.cases.c.created_at.desc())
+                .limit(limit)
+            ).all()
+
+        results = []
+        for r in rows:
+            metadata = json.loads(r.metadata_json) if r.metadata_json else {}
+            breakdown = json.loads(r.breakdown_json) if r.breakdown_json else {}
+            results.append(
+                {
+                    "intake_id": r.intake_id,
+                    "classification": r.classification,
+                    "composite_score": r.composite_score,
+                    "summary": r.summary_text,
+                    "created_at": r.created_at,
+                    "submitted_at": r.created_at,
                     "metadata": metadata,
                     "breakdown": breakdown,
-                    # Convenience top-level fields used by frontend filters/search.
-                    "platform": (metadata or {}).get("platform"),
-                    "region": (metadata or {}).get("region"),
-                    "actor_id": (metadata or {}).get("actor_id"),
-                    "language": (metadata or {}).get("language"),
-                    "source": (metadata or {}).get("source"),
-                    "tags": (metadata or {}).get("tags"),
-                })(
-                    json.loads(r[5]) if r[5] else {},
-                    json.loads(r[6]) if r[6] else {},
-                )
-                for r in rows
-            ]
+                    "platform": metadata.get("platform"),
+                    "region": metadata.get("region"),
+                    "actor_id": metadata.get("actor_id"),
+                    "language": metadata.get("language"),
+                    "source": metadata.get("source"),
+                    "tags": metadata.get("tags"),
+                }
+            )
+
+        return results
 
     # ==================== User Management ====================
-
     def create_user(self, username: str, password_hash: str, role: str) -> bool:
         """Create a new user account. Returns True if successful, False if username exists."""
         try:
-            with self._cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO users (username, password_hash, role, created_at)
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    (username.lower(), password_hash, role, datetime.utcnow().isoformat()),
+            with self.engine.begin() as conn:
+                conn.execute(
+                    self.users.insert().values(
+                        username=username.lower(),
+                        password_hash=password_hash,
+                        role=role,
+                        created_at=self._now(),
+                    )
                 )
-                return True
-        except sqlite3.IntegrityError:
+            return True
+        except IntegrityError:
             # Username already exists
             return False
 
     def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
         """Get user by username. Returns None if not found."""
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                SELECT id, username, password_hash, role, created_at, last_login
-                FROM users
-                WHERE username = ?
-                """,
-                (username.lower(),),
-            )
-            row = cur.fetchone()
-            if not row:
-                return None
-            return {
-                "id": row[0],
-                "username": row[1],
-                "password_hash": row[2],
-                "role": row[3],
-                "created_at": row[4],
-                "last_login": row[5],
-            }
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(
+                    self.users.c.id,
+                    self.users.c.username,
+                    self.users.c.password_hash,
+                    self.users.c.role,
+                    self.users.c.created_at,
+                    self.users.c.last_login,
+                ).where(self.users.c.username == username.lower())
+            ).one_or_none()
+
+        if not row:
+            return None
+
+        return {
+            "id": row.id,
+            "username": row.username,
+            "password_hash": row.password_hash,
+            "role": row.role,
+            "created_at": row.created_at,
+            "last_login": row.last_login,
+        }
 
     def update_last_login(self, username: str) -> None:
         """Update the last login timestamp for a user."""
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                UPDATE users
-                SET last_login = ?
-                WHERE username = ?
-                """,
-                (datetime.utcnow().isoformat(), username.lower()),
+        with self.engine.begin() as conn:
+            conn.execute(
+                self.users.update()
+                .where(self.users.c.username == username.lower())
+                .values(last_login=self._now())
             )
 

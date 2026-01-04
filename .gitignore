@@ -71,8 +71,7 @@ media/
 instance/
 
 # dotenv
-.env
-.env.*
+.env.local
 
 # Frontend environment files
 frontend/.env.local
