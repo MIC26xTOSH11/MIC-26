@@ -8,6 +8,7 @@ import dynamic from "next/dynamic";
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/dist/ScrollTrigger';
 import { Button } from "@/components/ui/button";
+import { GradientButton } from "@/components/ui/gradient-button";
 import TeamGrid from "@/components/ui/team-grid";
 import RuixenStats from "@/components/ui/ruixen-stats";
 import FAQWithSpiral from "@/components/ui/faq-section";
@@ -27,6 +28,8 @@ import {
 const BlobCanvas = dynamic(() => import('@/components/BlobCanvas'), { ssr: false });
 const HexGrid = dynamic(() => import('@/components/HexGrid'), { ssr: false });
 const WebGLOrbs = dynamic(() => import('@/components/WebGLOrbs'), { ssr: false });
+const LandingHoneycombBackground = dynamic(() => import('@/components/LandingHoneycombBackground'), { ssr: false });
+const GlowingEffect = dynamic(() => import('@/components/ui/glowing-effect').then(mod => ({ default: mod.GlowingEffect })), { ssr: false });
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
@@ -57,22 +60,25 @@ export default function LandingPage() {
       trigger: mainRef.current,
       start: 'top top',
       end: 'bottom bottom',
-      scrub: 1,
+      scrub: 0.8,
       onUpdate: (self) => {
         if (!ticking) {
           requestAnimationFrame(() => {
             setScrollProgress(self.progress);
             
-            // Zero-G warp effects with throttling
-            const velocity = self.getVelocity() / 1000;
-            const intensity = Math.abs(velocity);
-            
-            if (intensity > 0.01) {
+            // Zero-G jelly effect based on scroll velocity (softer, steadier)
+            const rawVelocity = self.getVelocity() / 1000;
+            const clampedVelocity = Math.max(-1.2, Math.min(1.2, rawVelocity));
+            const intensity = Math.abs(clampedVelocity);
+            const wiggle = clampedVelocity;
+
+            if (intensity > 0.015) {
               gsap.to('.warp-element', {
-                scaleX: 1 + intensity * 0.05,
-                skewY: velocity * 0.3,
-                yPercent: velocity * 1.5,
-                duration: 0.5,
+                scaleX: 1 + intensity * 0.02,
+                scaleY: 1 - intensity * 0.015,
+                skewY: clampedVelocity * 0.12,
+                yPercent: wiggle * 8,
+                duration: 0.7,
                 ease: 'power2.out',
                 overwrite: 'auto'
               });
@@ -93,39 +99,48 @@ export default function LandingPage() {
         trigger: section,
         start: 'top bottom',
         end: 'bottom top',
-        scrub: 2,
+        scrub: 1.5,
         onUpdate: (self) => {
-          const speed = 0.5 + i * 0.3;
-          const y = -(self.progress - 0.5) * 150 * speed;
+          const speed = 0.4 + i * 0.2;
+          const y = -(self.progress - 0.5) * 120 * speed;
           section.style.transform = `translate3d(0, ${y}px, 0)`;
           section.style.willChange = 'transform';
         }
       });
     });
 
+    // Gentle floating loop for all warp elements (jelly-like drift)
+    const bobTweens = gsap.utils.toArray('.warp-element').map((el, idx) =>
+      gsap.to(el, {
+        y: '+=18',
+        duration: 2.6 + (idx % 4) * 0.3,
+        yoyo: true,
+        repeat: -1,
+        ease: 'sine.inOut',
+        delay: (idx % 5) * 0.12,
+      })
+    );
+
     return () => {
+      bobTweens.forEach(t => t.kill());
       ScrollTrigger.getAll().forEach(trigger => trigger.kill());
     };
   }, []);
-
-  // Dynamic gradient based on scroll progress
-  const gradientHue = 60 + scrollProgress * 240; // Gold (60) to Purple (300)
 
   return (
     <div
       ref={mainRef}
       className="relative min-h-screen overflow-x-hidden"
       style={{
-        background: `linear-gradient(135deg, 
-          hsl(${gradientHue}, 30%, 8%) 0%, 
-          hsl(${gradientHue + 60}, 40%, 10%) 50%,
-          hsl(${gradientHue + 120}, 35%, 8%) 100%)`
+        background: 'linear-gradient(135deg, hsl(240, 30%, 5%) 0%, hsl(250, 35%, 7%) 50%, hsl(260, 25%, 6%) 100%)',
+        backgroundAttachment: 'fixed'
       }}
     >
       {/* Animated Background Layers */}
       <BlobCanvas />
       <HexGrid />
       <WebGLOrbs isMenuOpen={menuOpen} />
+      <LandingHoneycombBackground />
 
       {/* Cosmic Background Effect */}
       <div className="fixed inset-0 pointer-events-none z-0">
@@ -133,7 +148,7 @@ export default function LandingPage() {
           className="absolute inset-0 opacity-30"
           style={{
             background: `radial-gradient(circle at 50% 50%, 
-              hsla(${gradientHue}, 70%, 50%, 0.2) 0%, 
+              hsla(250, 70%, 50%, 0.2) 0%, 
               transparent 70%)`
           }}
         />
@@ -196,7 +211,7 @@ export default function LandingPage() {
               </span>
             </div>
 
-            <h1 className="text-5xl sm:text-6xl lg:text-8xl font-bold tracking-tight text-white mb-6 leading-tight">
+            <h1 className="text-6xl sm:text-7xl lg:text-9xl font-bold tracking-tight text-white mb-6 leading-tight">
               <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent">
                 AI-Powered
               </span>
@@ -206,19 +221,14 @@ export default function LandingPage() {
               Detection
             </h1>
 
-            <p className="text-xl sm:text-2xl text-slate-300 mb-12 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-2xl sm:text-3xl text-slate-300 mb-12 max-w-3xl mx-auto leading-relaxed">
               Real-time narrative analysis, threat intelligence, and tamper-evident
               federated ledger for investigative teams
             </p>
 
             <div className="flex justify-center mb-12">
               <Link href="/signup" className="w-full max-w-md">
-                <Button 
-                  size="lg" 
-                  className="w-full text-lg px-12 py-7 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all duration-300 hover:scale-105"
-                >
-                  Get Started
-                </Button>
+                <GradientButton className="w-full text-lg py-4">Get Started Now</GradientButton>
               </Link>
             </div>
 
@@ -260,13 +270,23 @@ export default function LandingPage() {
               ].map((feature, i) => (
                 <div
                   key={i}
-                  className="warp-element group relative p-8 bg-slate-900/30 backdrop-blur-xl border border-white/10 rounded-3xl hover:border-emerald-400/50 transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-emerald-500/20"
+                  className="warp-element group relative rounded-3xl overflow-hidden"
                 >
-                  <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 flex items-center justify-center mb-6 group-hover:bg-emerald-500/30 transition-colors">
-                    <feature.icon className="w-8 h-8 text-emerald-400" />
+                  <GlowingEffect
+                    spread={60}
+                    glow={true}
+                    disabled={false}
+                    proximity={100}
+                    inactiveZone={0.01}
+                    borderWidth={2}
+                  />
+                  <div className="relative p-8 bg-slate-900/30 backdrop-blur-xl border border-white/10 rounded-3xl hover:border-emerald-400/50 transition-all duration-500">
+                    <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 flex items-center justify-center mb-6 group-hover:bg-emerald-500/30 transition-colors">
+                      <feature.icon className="w-8 h-8 text-emerald-400" />
+                    </div>
+                    <h3 className="text-2xl font-semibold mb-3 text-white">{feature.title}</h3>
+                    <p className="text-slate-400">{feature.desc}</p>
                   </div>
-                  <h3 className="text-2xl font-semibold mb-3 text-white">{feature.title}</h3>
-                  <p className="text-slate-400">{feature.desc}</p>
                 </div>
               ))}
             </div>
@@ -330,9 +350,9 @@ export default function LandingPage() {
               </p>
               <div className="flex justify-center">
                 <Link href="/signup" className="w-full max-w-md">
-                  <Button size="lg" className="w-full text-lg px-12 py-7 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg hover:scale-105 transition-all duration-300">
+                  <GradientButton className="w-full text-lg py-5 shadow-lg hover:scale-105 transition-all duration-300">
                     Get Started Now
-                  </Button>
+                  </GradientButton>
                 </Link>
               </div>
             </div>
