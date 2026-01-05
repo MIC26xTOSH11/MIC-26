@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import CaseTable from "@/components/CaseTable";
 import CaseDetail from "@/components/CaseDetail";
@@ -24,7 +24,7 @@ function bucketizeClassification(value) {
   return "unknown";
 }
 
-export default function SubmissionsPage() {
+function SubmissionsPageContent() {
   const searchParams = useSearchParams();
   const caseIdFromUrl = searchParams.get('case');
   
@@ -289,5 +289,20 @@ export default function SubmissionsPage() {
 
       {toast.message && <Toast message={toast.message} tone={toast.tone} />}
     </div>
+  );
+}
+
+export default function SubmissionsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-slate-950">
+        <div className="text-center">
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-700 border-t-emerald-500"></div>
+          <p className="mt-4 text-slate-400">Loading submissions...</p>
+        </div>
+      </div>
+    }>
+      <SubmissionsPageContent />
+    </Suspense>
   );
 }
