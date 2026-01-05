@@ -37,7 +37,7 @@ function bucketizeClassification(value) {
 export default function AnalyticsPage() {
   const { user } = useAuth();
   const [results, setResults] = useState([]);
-  const [timeRange, setTimeRange] = useState("7d"); // 24h, 7d, 30d, all
+  const [timeRange, setTimeRange] = useState("all"); // 24h, 7d, 30d, all
 
   useEffect(() => {
     const loadCases = async () => {
@@ -232,6 +232,7 @@ export default function AnalyticsPage() {
           <h1 className="text-3xl font-bold text-white">Analytics Dashboard</h1>
           <p className="mt-2 text-slate-400">
             Insights and trends from {analytics.total} analyzed cases
+            <span className="ml-2 text-xs text-emerald-400">({timeRange === "all" ? "All Time" : timeRange.toUpperCase()})</span>
           </p>
         </div>
 

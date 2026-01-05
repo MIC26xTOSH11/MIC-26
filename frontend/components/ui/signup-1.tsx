@@ -291,7 +291,7 @@ const SignupComponent = () => {
                     disabled={isLoading}
                   />
                 </div>
-                <a href="/login" className='font-light text-sm md:text-md'>Already have an account? Sign in</a>
+                     <a href="/login" className='font-light text-sm md:text-md mt-2'>Already have an account? <span className='text-emerald-400 hover:text-emerald-300 transition-colors'>Sign in</span></a>
                 <div className='flex gap-4 justify-center items-center'>
                    <button 
                     type="submit"

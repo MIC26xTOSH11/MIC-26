@@ -236,8 +236,8 @@ export default function HomePage() {
               </span>
             </h1>
             <p className="mt-4 max-w-2xl text-lg text-slate-400">
-              Real-time narrative analysis, threat intelligence, and federated blockchain ledger
-              for comprehensive disinformation detection.
+                Real-time narrative analysis and adaptive threat intelligence
+                for comprehensive disinformation detection.
             </p>
           </div>
 
