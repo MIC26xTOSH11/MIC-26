@@ -228,7 +228,9 @@ export default function LandingPage() {
 
             <div className="flex justify-center mb-12">
               <Link href="/signup" className="w-full max-w-md">
-                <GradientButton className="w-full text-lg py-4">Get Started Now</GradientButton>
+                <GradientButton className="w-full text-lg py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg hover:scale-105 transition-all duration-300">
+                  Get Started Now
+                </GradientButton>
               </Link>
             </div>
 
@@ -350,7 +352,7 @@ export default function LandingPage() {
               </p>
               <div className="flex justify-center">
                 <Link href="/signup" className="w-full max-w-md">
-                  <GradientButton className="w-full text-lg py-5 shadow-lg hover:scale-105 transition-all duration-300">
+                  <GradientButton className="w-full text-lg py-5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg hover:scale-105 transition-all duration-300">
                     Get Started Now
                   </GradientButton>
                 </Link>
