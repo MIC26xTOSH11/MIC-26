@@ -6,7 +6,7 @@ Define styling strategy for the dashboards and supporting UI.
 ## Current Strategy
 - Tailwind CSS is the primary styling system.
 - globals.css (frontend/app) houses base styles and custom classes.
-- tailwind.config.js defines theme extensions and content scanning.
+- tailwind.config.js defines theme extensionss and content scanning.
 
 ## Design Principles
 - Utility-first styling for speed and consistency.
