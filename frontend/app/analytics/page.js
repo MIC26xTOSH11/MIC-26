@@ -17,6 +17,11 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
 } from "recharts";
 
 function bucketizeClassification(value) {
@@ -37,7 +42,7 @@ function bucketizeClassification(value) {
 export default function AnalyticsPage() {
   const { user } = useAuth();
   const [results, setResults] = useState([]);
-  const [timeRange, setTimeRange] = useState("7d"); // 24h, 7d, 30d, all
+  const [timeRange, setTimeRange] = useState("all"); // 24h, 7d, 30d, all
 
   useEffect(() => {
     const loadCases = async () => {
@@ -200,6 +205,96 @@ export default function AnalyticsPage() {
         ? azureSafetyScores.reduce((sum, v) => sum + v, 0) / azureSafetyScores.length
         : null;
 
+    // Signal Contribution Radar - average signal strengths across all cases
+    const signalContributions = [];
+    const signals = {
+      "OpenAI Risk": { sum: 0, count: 0 },
+      "Safety Score": { sum: 0, count: 0 },
+      "Behavioral": { sum: 0, count: 0 },
+      "Language": { sum: 0, count: 0 },
+      "Pattern": { sum: 0, count: 0 },
+    };
+
+    filtered.forEach((r) => {
+      const bd = r?.breakdown;
+      if (!bd) return;
+      
+      if (typeof bd.azure_openai_risk === "number") {
+        signals["OpenAI Risk"].sum += bd.azure_openai_risk;
+        signals["OpenAI Risk"].count++;
+      }
+      if (typeof bd.azure_safety_score === "number") {
+        signals["Safety Score"].sum += bd.azure_safety_score;
+        signals["Safety Score"].count++;
+      }
+      if (typeof bd.behavioral_score === "number") {
+        signals["Behavioral"].sum += bd.behavioral_score;
+        signals["Behavioral"].count++;
+      }
+      if (typeof bd.language_baseline_factor === "number") {
+        signals["Language"].sum += bd.language_baseline_factor;
+        signals["Language"].count++;
+      }
+      if (typeof bd.pattern_match_score === "number") {
+        signals["Pattern"].sum += bd.pattern_match_score;
+        signals["Pattern"].count++;
+      }
+    });
+
+    Object.entries(signals).forEach(([signal, data]) => {
+      if (data.count > 0) {
+        signalContributions.push({
+          signal,
+          value: ((data.sum / data.count) * 100).toFixed(1),
+          fullMark: 100,
+        });
+      }
+    });
+
+    // Comparative Analytics - Compare time periods (enterprise only)
+    let comparativeData = null;
+    if (timeRange !== "all") {
+      // Current period stats
+      const currentPeriod = {
+        avgScore: filtered.reduce((sum, r) => sum + (r.composite_score || 0), 0) / (filtered.length || 1),
+        maliciousCount: filtered.filter((r) => r.classification === "malicious").length,
+        total: filtered.length,
+      };
+
+      // Previous period (same duration before current period)
+      const now = Date.now();
+      let prevStart, prevEnd;
+      if (timeRange === "24h") {
+        prevStart = now - 48 * 60 * 60 * 1000;
+        prevEnd = now - 24 * 60 * 60 * 1000;
+      } else if (timeRange === "7d") {
+        prevStart = now - 14 * 24 * 60 * 60 * 1000;
+        prevEnd = now - 7 * 24 * 60 * 60 * 1000;
+      } else if (timeRange === "30d") {
+        prevStart = now - 60 * 24 * 60 * 60 * 1000;
+        prevEnd = now - 30 * 24 * 60 * 60 * 1000;
+      }
+
+      const prevPeriod = results.filter((r) => {
+        const ts = new Date(r.timestamp).getTime();
+        return ts >= prevStart && ts < prevEnd;
+      });
+
+      const prevStats = {
+        avgScore: prevPeriod.reduce((sum, r) => sum + (r.composite_score || 0), 0) / (prevPeriod.length || 1),
+        maliciousCount: prevPeriod.filter((r) => r.classification === "malicious").length,
+        total: prevPeriod.length,
+      };
+
+      comparativeData = {
+        current: currentPeriod,
+        previous: prevStats,
+        scoreChange: ((currentPeriod.avgScore - prevStats.avgScore) / (prevStats.avgScore || 1)) * 100,
+        volumeChange: ((currentPeriod.total - prevStats.total) / (prevStats.total || 1)) * 100,
+        maliciousChange: ((currentPeriod.maliciousCount - prevStats.maliciousCount) / (prevStats.maliciousCount || 1)) * 100,
+      };
+    }
+
     return {
       total: filtered.length,
       classifications: Object.entries(classifications).map(([name, value]) => ({ name, value })),
@@ -214,6 +309,8 @@ export default function AnalyticsPage() {
       avgScore: filtered.reduce((sum, r) => sum + (r.composite_score || 0), 0) / (filtered.length || 1),
       avgAzureOpenAiRisk,
       avgAzureSafety,
+      signalContributions,
+      comparativeData,
     };
   }, [results, timeRange]);
 
@@ -232,6 +329,7 @@ export default function AnalyticsPage() {
           <h1 className="text-3xl font-bold text-white">Analytics Dashboard</h1>
           <p className="mt-2 text-slate-400">
             Insights and trends from {analytics.total} analyzed cases
+            <span className="ml-2 text-xs text-emerald-400">({timeRange === "all" ? "All Time" : timeRange.toUpperCase()})</span>
           </p>
         </div>
 
@@ -500,6 +598,186 @@ export default function AnalyticsPage() {
                 <Bar dataKey="value" fill="#10b981" />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Signal Contribution Radar - All Roles */}
+        {analytics.signalContributions && analytics.signalContributions.length > 0 && (
+          <div className="rounded-3xl border border-cyan-500/30 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 p-6 shadow-2xl shadow-cyan-500/5 lg:col-span-2">
+            <h3 className="mb-4 text-lg font-semibold text-white">Signal Contribution Analysis</h3>
+            <p className="mb-4 text-sm text-slate-400">
+              Average signal strengths across all analyzed cases - shows which detection signals contribute most to threat scoring
+            </p>
+            <ResponsiveContainer width="100%" height={400}>
+              <RadarChart data={analytics.signalContributions}>
+                <PolarGrid stroke="#334155" />
+                <PolarAngleAxis 
+                  dataKey="signal" 
+                  tick={(props) => {
+                    const { x, y, payload } = props;
+                    const offsetY = payload.value === "OpenAI Risk" ? -8 : 0;
+                    return (
+                      <text
+                        x={x}
+                        y={y + offsetY}
+                        textAnchor="middle"
+                        fill="#94a3b8"
+                        fontSize={13}
+                      >
+                        {payload.value}
+                      </text>
+                    );
+                  }}
+                />
+                <PolarRadiusAxis 
+                  angle={90} 
+                  domain={[0, 100]} 
+                  tick={{ fill: "#94a3b8" }}
+                />
+                <Radar
+                  name="Signal Strength"
+                  dataKey="value"
+                  stroke="#06b6d4"
+                  fill="#06b6d4"
+                  fillOpacity={0.6}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#1e293b",
+                    border: "1px solid #334155",
+                    borderRadius: "12px",
+                  }}
+                  formatter={(value) => `${value}%`}
+                />
+                <Legend wrapperStyle={{ color: "#94a3b8" }} />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Comparative + Causal Analytics - Enterprise Only */}
+        {user?.role === 'enterprise' && analytics.comparativeData && (
+          <div className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-orange-500/10 p-6 shadow-2xl shadow-amber-500/5 lg:col-span-2">
+            <div className="mb-6 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-white">Comparative Period Analysis</h3>
+              <span className="px-2 py-0.5 text-xs rounded-full bg-amber-500/30 text-amber-300">Enterprise</span>
+            </div>
+            <p className="mb-6 text-sm text-slate-400">
+              Compares current period metrics against the previous equivalent period to identify trends and causal patterns
+            </p>
+            
+            <div className="grid gap-6 md:grid-cols-3">
+              {/* Threat Score Change */}
+              <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-slate-400">Avg Threat Score</p>
+                  <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                    analytics.comparativeData.scoreChange > 0 
+                      ? 'bg-red-500/20 text-red-400'
+                      : analytics.comparativeData.scoreChange < 0
+                      ? 'bg-green-500/20 text-green-400'
+                      : 'bg-slate-500/20 text-slate-400'
+                  }`}>
+                    {analytics.comparativeData.scoreChange > 0 ? '↑' : analytics.comparativeData.scoreChange < 0 ? '↓' : '→'}
+                    {Math.abs(analytics.comparativeData.scoreChange).toFixed(1)}%
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs text-slate-500">Current Period</p>
+                    <p className="text-2xl font-bold text-white">
+                      {(analytics.comparativeData.current.avgScore * 100).toFixed(1)}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Previous Period</p>
+                    <p className="text-lg text-slate-400">
+                      {(analytics.comparativeData.previous.avgScore * 100).toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Volume Change */}
+              <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-slate-400">Submission Volume</p>
+                  <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                    analytics.comparativeData.volumeChange > 0 
+                      ? 'bg-blue-500/20 text-blue-400'
+                      : analytics.comparativeData.volumeChange < 0
+                      ? 'bg-orange-500/20 text-orange-400'
+                      : 'bg-slate-500/20 text-slate-400'
+                  }`}>
+                    {analytics.comparativeData.volumeChange > 0 ? '↑' : analytics.comparativeData.volumeChange < 0 ? '↓' : '→'}
+                    {Math.abs(analytics.comparativeData.volumeChange).toFixed(1)}%
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs text-slate-500">Current Period</p>
+                    <p className="text-2xl font-bold text-white">
+                      {analytics.comparativeData.current.total}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Previous Period</p>
+                    <p className="text-lg text-slate-400">
+                      {analytics.comparativeData.previous.total}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Malicious Detection Change */}
+              <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-slate-400">Malicious Cases</p>
+                  <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                    analytics.comparativeData.maliciousChange > 0 
+                      ? 'bg-red-500/20 text-red-400'
+                      : analytics.comparativeData.maliciousChange < 0
+                      ? 'bg-green-500/20 text-green-400'
+                      : 'bg-slate-500/20 text-slate-400'
+                  }`}>
+                    {analytics.comparativeData.maliciousChange > 0 ? '↑' : analytics.comparativeData.maliciousChange < 0 ? '↓' : '→'}
+                    {Math.abs(analytics.comparativeData.maliciousChange).toFixed(1)}%
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs text-slate-500">Current Period</p>
+                    <p className="text-2xl font-bold text-red-400">
+                      {analytics.comparativeData.current.maliciousCount}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Previous Period</p>
+                    <p className="text-lg text-slate-400">
+                      {analytics.comparativeData.previous.maliciousCount}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+              <p className="text-sm font-medium text-amber-300 mb-2">📊 Causal Insights</p>
+              <ul className="space-y-1 text-xs text-slate-300">
+                {analytics.comparativeData.scoreChange > 10 && (
+                  <li>• Significant increase in threat scores may indicate emerging attack patterns or higher-risk submissions</li>
+                )}
+                {analytics.comparativeData.volumeChange > 20 && (
+                  <li>• Volume spike detected - consider correlating with external events or campaigns</li>
+                )}
+                {analytics.comparativeData.maliciousChange > 15 && (
+                  <li>• Rising malicious detection rate suggests potential coordinated threat activity</li>
+                )}
+                {Math.abs(analytics.comparativeData.scoreChange) < 5 && Math.abs(analytics.comparativeData.volumeChange) < 5 && (
+                  <li>• Stable period-over-period metrics indicate consistent threat landscape</li>
+                )}
+              </ul>
+            </div>
           </div>
         )}
       </div>

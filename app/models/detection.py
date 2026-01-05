@@ -37,6 +37,28 @@ class DetectorEngine:
     SUSPECT_PLATFORMS = {"unknown-forum", "darknet", "anonymized-messaging", "telegram-channel"}
     HIGH_RISK_TAGS = {"election", "extremism", "disinfo-campaign", "riot", "leak"}
 
+    # Language Baseline Normalization Factors
+    # Different languages for the same text produce different raw scores due to linguistic structure.
+    # These factors normalize scores so English-equivalent content yields consistent assessments.
+    # Formula: normalized_score = raw_score / language_baseline_factor
+    LANGUAGE_BASELINE_FACTORS = {
+        "en": 1.0,    # English (baseline)
+        "hi": 0.92,   # Hindi
+        "ar": 0.88,   # Arabic
+        "es": 0.95,   # Spanish
+        "fr": 0.93,   # French
+        "de": 0.91,   # German
+        "pt": 0.94,   # Portuguese
+        "ru": 0.89,   # Russian
+        "zh": 0.72,   # Chinese
+        "ja": 0.75,   # Japanese
+        "ko": 0.77,   # Korean
+        "ta": 0.67,   # Tamil
+        "te": 0.65,   # Telugu
+        "ur": 0.87,   # Urdu
+        "bn": 0.70,   # Bengali
+    }
+
     # Expanded Function Words (Stopwords)
     FUNCTION_WORDS = {
         "the", "a", "an", "to", "of", "and", "in", "that", "is", "for",
@@ -219,6 +241,23 @@ class DetectorEngine:
             azure_openai_risk=azure_openai_risk,
             azure_safety_score=azure_safety_score,
         )
+
+        # 7. Language Normalization
+        # Normalize composite score based on detected language to ensure consistent assessment
+        # across different languages. English is the baseline (factor = 1.0).
+        language_factor = self.LANGUAGE_BASELINE_FACTORS.get(detected_language, 1.0)
+        raw_composite = composite
+        composite = composite / language_factor
+        
+        # Ensure normalized score stays in valid range [0, 1]
+        composite = max(0.0, min(1.0, composite))
+        
+        if language_factor != 1.0:
+            logger.info(
+                f"Language normalization applied: {detected_language_name} ({detected_language}) "
+                f"factor={language_factor:.2f}, raw_score={raw_composite:.3f} -> "
+                f"normalized_score={composite:.3f}"
+            )
 
         classification = self._classify(composite)
 

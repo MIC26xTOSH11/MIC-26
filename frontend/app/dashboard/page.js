@@ -216,15 +216,6 @@ export default function HomePage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Link
-                href="/simple"
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-300 transition hover:border-emerald-400 hover:text-emerald-300"
-              >
-                Guided Mode
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
               <button
                 onClick={logout}
                 className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-300 transition hover:border-red-400 hover:text-red-300"
@@ -245,8 +236,8 @@ export default function HomePage() {
               </span>
             </h1>
             <p className="mt-4 max-w-2xl text-lg text-slate-400">
-              Real-time narrative analysis, threat intelligence, and federated blockchain ledger
-              for comprehensive disinformation detection.
+                Real-time narrative analysis and adaptive threat intelligence
+                for comprehensive disinformation detection.
             </p>
           </div>
 
@@ -749,10 +740,10 @@ export default function HomePage() {
                 {/* Action Buttons */}
                 <div className="flex gap-3">
                   <Link
-                    href="/submissions"
+                    href={`/submissions?case=${results[0].intake_id}`}
                     className="flex-1 rounded-xl bg-emerald-500/10 px-4 py-3 text-center text-sm font-medium text-emerald-400 transition hover:bg-emerald-500/20"
                   >
-                    View All Cases
+                    View in detail
                   </Link>
                   <Link
                     href="/analytics"

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useRef } from "react";
 import Image from "next/image";
+import { FlipCard, FlipCardFront, FlipCardBack } from "@/components/ui/flip-card";
 
 type TeamMember = {
   id: number;
@@ -58,22 +58,76 @@ interface TeamGridProps {
 }
 
 export default function TeamGrid({ className = "" }: TeamGridProps) {
-  const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const setRef = useRef<HTMLDivElement | null>(null);
 
-  const overlayVariants = {
-    hidden: {
-      opacity: 0,
-      y: 20,
-    },
-    visible: {
-      opacity: 1,
-      y: 0,
-    },
-    exit: {
-      opacity: 0,
-      y: 20,
-    },
-  };
+  useEffect(() => {
+    const containerEl = containerRef.current;
+    const trackEl = trackRef.current;
+    const setEl = setRef.current;
+    if (!containerEl || !trackEl || !setEl) return;
+
+    let rafId = 0;
+    let lastTs = 0;
+    let x = 0;
+    let setWidth = 0;
+
+    const measure = () => {
+      setWidth = setEl.getBoundingClientRect().width;
+    };
+
+    measure();
+
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    ro?.observe(setEl);
+
+    // Tuned for a smooth, “professional” marquee.
+    const BASE_SPEED_PX_S = 54;
+    const HOVER_SPEED_PX_S = 26;
+    const SPEED_SMOOTHING = 10; // higher = faster response
+
+    let currentSpeed = BASE_SPEED_PX_S;
+
+    const isCardHovered = () => {
+      // Stable even while items move (no enter/leave churn).
+      return containerEl.querySelector('[data-team-card]:hover') !== null;
+    };
+
+    const onVisibilityChange = () => {
+      // Avoid a big dt spike after tab switches (looks like a “jump/back”).
+      lastTs = 0;
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    const tick = (ts: number) => {
+      if (!lastTs) lastTs = ts;
+      const dt = Math.min(0.05, (ts - lastTs) / 1000);
+      lastTs = ts;
+
+      const targetSpeed = isCardHovered() ? HOVER_SPEED_PX_S : BASE_SPEED_PX_S;
+      const alpha = 1 - Math.exp(-SPEED_SMOOTHING * dt);
+      currentSpeed = currentSpeed + (targetSpeed - currentSpeed) * alpha;
+
+      x -= currentSpeed * dt;
+
+      if (setWidth > 0 && x <= -setWidth) {
+        x += setWidth;
+      }
+
+      trackEl.style.transform = `translate3d(${x}px, 0, 0)`;
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      ro?.disconnect();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
 
   return (
     <section className={`relative py-20 lg:py-32 ${className}`}>
@@ -96,84 +150,145 @@ export default function TeamGrid({ className = "" }: TeamGridProps) {
           </p>
         </div>
 
-        {/* Team Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 lg:gap-8">
-          {teamMembers.map((member) => (
-            <motion.div
-              key={member.id}
-              className="relative group"
-              whileHover={{ scale: 1.05 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              onHoverStart={() => setHoveredId(member.id)}
-              onHoverEnd={() => setHoveredId(null)}
-              onTouchStart={() => setHoveredId(hoveredId === member.id ? null : member.id)}
-              aria-expanded={hoveredId === member.id}
-            >
-              {/* Base Card */}
-              <div className="relative p-6 bg-gradient-to-br from-teal-500/20 via-emerald-500/20 to-green-500/20 backdrop-blur-xl border border-white/10 rounded-lg shadow-lg hover:border-emerald-400/50 transition-all duration-500 overflow-hidden">
-                {/* Team Member Photo */}
-                <div className="aspect-square rounded-2xl mb-4 overflow-hidden bg-gradient-to-br from-emerald-500 to-cyan-500 relative">
-                  {member.imageSrc ? (
-                    <Image
-                      src={member.imageSrc}
-                      alt={member.name}
-                      fill
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-5xl font-bold text-white">
-                      {member.initial}
-                    </div>
-                  )}
-                </div>
-
-                {/* Name & Role */}
-                <h3 className="text-2xl font-semibold mb-1 text-white">
-                  {member.name}
-                </h3>
-                <p className="text-slate-400">{member.role}</p>
-
-                {/* Hover Preview Overlay */}
-                <AnimatePresence>
-                  {hoveredId === member.id && (
-                    <motion.div
-                      className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center p-6 rounded-lg"
-                      variants={overlayVariants}
-                      initial="hidden"
-                      animate="visible"
-                      exit="exit"
-                      transition={{
-                        duration: 0.3,
-                        ease: "easeOut",
-                      }}
-                    >
-                      {/* Avatar Image */}
-                      {member.imageSrc && (
-                        <div className="w-20 h-20 rounded-full overflow-hidden mb-4 border-2 border-emerald-400 shadow-lg relative">
-                          <Image
-                            src={member.imageSrc}
-                            alt={member.name}
-                            fill
-                            className="object-cover"
-                          />
+        {/* Team Grid - Horizontal Scrolling */}
+        <div ref={containerRef} className="relative overflow-hidden">
+          <div
+            ref={trackRef}
+            className="flex will-change-transform"
+            style={{ transform: "translate3d(0, 0, 0)" }}
+          >
+            <div ref={setRef} className="flex gap-6 lg:gap-8 pr-6 lg:pr-8">
+              {teamMembers.map((member) => (
+                <div
+                  key={`first-${member.id}`}
+                  className="flex-shrink-0 w-[280px] sm:w-[320px]"
+                  data-team-card
+                >
+                  <FlipCard
+                    className="h-[450px] w-full"
+                    flipDirection={member.id % 2 === 0 ? "vertical" : "horizontal"}
+                  >
+                    <FlipCardFront className="rounded-lg">
+                      <div className="h-full p-6 bg-gradient-to-br from-teal-500/20 via-emerald-500/20 to-green-500/20 backdrop-blur-xl border border-white/10 rounded-lg shadow-lg">
+                        <div className="aspect-square rounded-2xl mb-4 overflow-hidden bg-gradient-to-br from-emerald-500 to-cyan-500 relative">
+                          {member.imageSrc ? (
+                            <Image
+                              src={member.imageSrc}
+                              alt={member.name}
+                              fill
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center text-5xl font-bold text-white">
+                              {member.initial}
+                            </div>
+                          )}
                         </div>
-                      )}
 
-                      {/* Quote */}
-                      <p className="text-lg italic text-emerald-300 mb-3 text-center font-medium">
-                        "{member.quote}"
-                      </p>
+                        <h3 className="text-2xl font-semibold mb-1 text-white">
+                          {member.name}
+                        </h3>
+                        <p className="text-slate-400">{member.role}</p>
+                      </div>
+                    </FlipCardFront>
 
-                      {/* Bio */}
-                      <p className="text-sm text-slate-300 text-center leading-relaxed">
-                        {member.bio}
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </motion.div>
-          ))}
+                    <FlipCardBack className="rounded-lg">
+                      <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-emerald-500/20 via-cyan-500/20 to-teal-500/20 backdrop-blur-xl border border-emerald-400/50 rounded-lg">
+                        <div className="w-20 h-20 rounded-full overflow-hidden mb-4 border-2 border-emerald-400 shadow-lg bg-gradient-to-br from-emerald-500 to-cyan-500 relative">
+                          {member.imageSrc ? (
+                            <Image
+                              src={member.imageSrc}
+                              alt={member.name}
+                              fill
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-white">
+                              {member.initial}
+                            </div>
+                          )}
+                        </div>
+
+                        <p className="text-lg italic text-emerald-300 mb-4 text-center font-medium">
+                          "{member.quote}"
+                        </p>
+
+                        <p className="text-sm text-slate-300 text-center leading-relaxed">
+                          {member.bio}
+                        </p>
+                      </div>
+                    </FlipCardBack>
+                  </FlipCard>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-6 lg:gap-8">
+              {teamMembers.map((member) => (
+                <div
+                  key={`second-${member.id}`}
+                  className="flex-shrink-0 w-[280px] sm:w-[320px]"
+                  data-team-card
+                >
+                  <FlipCard
+                    className="h-[450px] w-full"
+                    flipDirection={member.id % 2 === 0 ? "vertical" : "horizontal"}
+                  >
+                    <FlipCardFront className="rounded-lg">
+                      <div className="h-full p-6 bg-gradient-to-br from-teal-500/20 via-emerald-500/20 to-green-500/20 backdrop-blur-xl border border-white/10 rounded-lg shadow-lg">
+                        <div className="aspect-square rounded-2xl mb-4 overflow-hidden bg-gradient-to-br from-emerald-500 to-cyan-500 relative">
+                          {member.imageSrc ? (
+                            <Image
+                              src={member.imageSrc}
+                              alt={member.name}
+                              fill
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center text-5xl font-bold text-white">
+                              {member.initial}
+                            </div>
+                          )}
+                        </div>
+
+                        <h3 className="text-2xl font-semibold mb-1 text-white">
+                          {member.name}
+                        </h3>
+                        <p className="text-slate-400">{member.role}</p>
+                      </div>
+                    </FlipCardFront>
+
+                    <FlipCardBack className="rounded-lg">
+                      <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-emerald-500/20 via-cyan-500/20 to-teal-500/20 backdrop-blur-xl border border-emerald-400/50 rounded-lg">
+                        <div className="w-20 h-20 rounded-full overflow-hidden mb-4 border-2 border-emerald-400 shadow-lg bg-gradient-to-br from-emerald-500 to-cyan-500 relative">
+                          {member.imageSrc ? (
+                            <Image
+                              src={member.imageSrc}
+                              alt={member.name}
+                              fill
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-white">
+                              {member.initial}
+                            </div>
+                          )}
+                        </div>
+
+                        <p className="text-lg italic text-emerald-300 mb-4 text-center font-medium">
+                          "{member.quote}"
+                        </p>
+
+                        <p className="text-sm text-slate-300 text-center leading-relaxed">
+                          {member.bio}
+                        </p>
+                      </div>
+                    </FlipCardBack>
+                  </FlipCard>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </section>

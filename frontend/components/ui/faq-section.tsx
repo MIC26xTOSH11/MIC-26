@@ -4,6 +4,8 @@ export default function FAQWithSpiral() {
   const spiralRef = useRef<HTMLDivElement | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // Single state for tracking which FAQ is open (by index), null means all closed
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   // Spiral configuration
   const [cfg, setCfg] = useState({
@@ -199,6 +201,10 @@ export default function FAQWithSpiral() {
       a: "Built with Next.js 14, React, TypeScript, and Python FastAPI backend. We use Azure Cognitive Services, OpenAI GPT models, PostgreSQL for data persistence, JWT authentication, and advanced visualization with D3.js, Three.js, and Leaflet for global threat mapping.",
     },
     {
+      q: "How do you ensure data security and privacy?",
+      a: "End-to-end encryption, JWT-based authentication, role-based access control, secure file storage with watermarking, and compliance with GDPR standards. All data is encrypted at rest and in transit with regular security audits.",
+    },
+    {
       q: "Can I integrate Tattvadrishti into my existing platform?",
       a: "Yes! We provide RESTful APIs with comprehensive documentation. Our system supports role-based access control (Individual, Enterprise, Superuser), real-time webhooks, and can be deployed on-premises or cloud with containerized architecture.",
     },
@@ -206,10 +212,7 @@ export default function FAQWithSpiral() {
       q: "What kind of analytics and reporting do you offer?",
       a: "Real-time dashboards with heatmaps, radar charts, submission logs, hop-trace visualization, and federated blockchain tracking. Export detailed reports, configure custom alerts, and monitor global threat patterns with our intuitive analytics suite.",
     },
-    {
-      q: "How do you ensure data security and privacy?",
-      a: "End-to-end encryption, JWT-based authentication, role-based access control, secure file storage with watermarking, and compliance with GDPR standards. All data is encrypted at rest and in transit with regular security audits.",
-    },
+    
   ];
 
   const filtered = query
@@ -252,9 +255,17 @@ export default function FAQWithSpiral() {
 
         {/* Content */}
         <section className="relative">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {/* Added items-start to prevent flexbox from stretching sibling cards */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 items-start">
             {filtered.map((item, i) => (
-              <FAQItem key={i} q={item.q} a={item.a} index={i + 1} />
+              <FAQItem 
+                key={i} 
+                q={item.q} 
+                a={item.a} 
+                index={i + 1}
+                isOpen={openIndex === i}
+                onToggle={() => setOpenIndex(openIndex === i ? null : i)}
+              />
             ))}
           </div>
         </section>
@@ -312,23 +323,29 @@ export default function FAQWithSpiral() {
   );
 }
 
-function FAQItem({ q, a, index }: { q: string; a: string; index: number }) {
-  const [open, setOpen] = useState(false);
+// FAQ card component - receives isOpen and onToggle from parent to ensure only one card expands at a time
+function FAQItem({ q, a, index, isOpen, onToggle }: { 
+  q: string; 
+  a: string; 
+  index: number;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-white/15 bg-black/40 p-5 transition hover:border-emerald-500/40">
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={onToggle}
         className="flex w-full items-center justify-between text-left"
-        aria-expanded={open}
+        aria-expanded={isOpen}
       >
         <div className="flex items-baseline gap-3">
           <span className="text-xs text-emerald-500/60">{String(index).padStart(2, "0")}</span>
           <h3 className="text-base md:text-lg font-semibold leading-tight">{q}</h3>
         </div>
-        <span className="ml-4 text-white/60 transition group-hover:text-emerald-400">{open ? "–" : "+"}</span>
+        <span className="ml-4 text-white/60 transition group-hover:text-emerald-400">{isOpen ? "–" : "+"}</span>
       </button>
       <div
-        className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(.4,0,.2,1)] ${open ? "mt-3 grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
+        className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(.4,0,.2,1)] ${isOpen ? "mt-3 grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
       >
         <div className="min-h-0 overflow-hidden">
           <p className="text-sm text-white/70">{a}</p>
