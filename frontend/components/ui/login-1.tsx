@@ -137,20 +137,44 @@ const LoginComponent = () => {
 
    const socialIcons = [
     {
-      icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2m-.2 2A3.6 3.6 0 0 0 4 7.6v8.8C4 18.39 5.61 20 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6C20 5.61 18.39 4 16.4 4zm9.65 1.5a1.25 1.25 0 0 1 1.25 1.25A1.25 1.25 0 0 1 17.25 8A1.25 1.25 0 0 1 16 6.75a1.25 1.25 0 0 1 1.25-1.25M12 7a5 5 0 0 1 5 5a5 5 0 0 1-5 5a5 5 0 0 1-5-5a5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3a3 3 0 0 0 3 3a3 3 0 0 0 3-3a3 3 0 0 0-3-3"/></svg>,
+      // Google
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+          <path
+            fill="currentColor"
+            d="M12 10.2v3.92h5.52c-.24 1.26-1.44 3.7-5.52 3.7A6.3 6.3 0 0 1 5.7 12A6.3 6.3 0 0 1 12 6.18c1.8 0 3.01.77 3.7 1.43l2.52-2.42C16.6 3.68 14.53 2.6 12 2.6A9.4 9.4 0 0 0 2.6 12A9.4 9.4 0 0 0 12 21.4c5.45 0 9.06-3.83 9.06-9.23c0-.62-.07-1.09-.15-1.57z"
+          />
+        </svg>
+      ),
       href: '#',
       gradient: 'bg-[var(--color-bg)]',
     },
     {
-      icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M6.94 5a2 2 0 1 1-4-.002a2 2 0 0 1 4 .002M7 8.48H3V21h4zm6.32 0H9.34V21h3.94v-6.57c0-3.66 4.77-4 4.77 0V21H22v-7.93c0-6.17-7.06-5.94-8.72-2.91z"/></svg>,
+      // Microsoft
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M3 3h8.5v8.5H3z" />
+          <path fill="currentColor" d="M12.5 3H21v8.5h-8.5z" />
+          <path fill="currentColor" d="M3 12.5h8.5V21H3z" />
+          <path fill="currentColor" d="M12.5 12.5H21V21h-8.5z" />
+        </svg>
+      ),
       href: '#',
       bg: 'bg-[var(--color-bg)]',
     },
     {
-      icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M9.198 21.5h4v-8.01h3.604l.396-3.98h-4V7.5a1 1 0 0 1 1-1h3v-4h-3a5 5 0 0 0-5 5v2.01h-2l-.396 3.98h2.396z"/></svg>,
+      // GitHub
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+          <path
+            fill="currentColor"
+            d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.77.6-3.36-1.34-3.36-1.34c-.45-1.15-1.1-1.46-1.1-1.46c-.9-.62.07-.61.07-.61c1 .07 1.53 1.03 1.53 1.03c.89 1.52 2.34 1.08 2.91.82c.09-.65.35-1.08.63-1.33c-2.21-.25-4.54-1.11-4.54-4.95c0-1.09.39-1.98 1.03-2.68c-.1-.25-.45-1.27.1-2.65c0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.8c.85 0 1.71.11 2.51.34c1.91-1.29 2.75-1.02 2.75-1.02c.55 1.38.2 2.4.1 2.65c.64.7 1.03 1.59 1.03 2.68c0 3.85-2.34 4.69-4.57 4.94c.36.31.68.92.68 1.86v2.76c0 .27.18.58.69.48A10 10 0 0 0 12 2"
+          />
+        </svg>
+      ),
       href: '#',
       bg: 'bg-[var(--color-bg)]',
-    }
+    },
   ];
 
   return (
