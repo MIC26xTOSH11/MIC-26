@@ -168,7 +168,7 @@ const LoginComponent = () => {
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}>
             <div
-              className={`absolute pointer-events-none w-[500px] h-[500px] bg-gradient-to-r from-emerald-300/30 via-cyan-300/30 to-teal-300/30 rounded-full blur-3xl transition-opacity duration-200 ${
+              className={`absolute pointer-events-none w-[500px] h-[500px] bg-gradient-to-r from-emerald-300/30 via-cyan-300/30 to-teal-300/30 rounded-full blur-xl transition-opacity duration-200 ${
                 isHovering ? 'opacity-100' : 'opacity-0'
               }`}
               style={{

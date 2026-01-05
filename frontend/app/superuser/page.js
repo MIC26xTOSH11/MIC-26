@@ -340,7 +340,7 @@ IMMUTABLE COMPLIANCE RECORD - DO NOT MODIFY
   if (user && !hasPermission('view_detailed_reports')) {
     return (
       <main className="relative min-h-screen pb-20 overflow-x-hidden bg-slate-950">
-        <div className="absolute -left-32 top-20 h-72 w-72 rounded-full bg-purple-500/30 blur-3xl opacity-20" />
+        <div className="absolute -left-32 top-20 h-72 w-72 rounded-full bg-purple-500/30 blur-xl opacity-20" />
         <div className="absolute -right-44 bottom-[-6rem] h-96 w-96 rounded-full bg-fuchsia-500/20 blur-[160px] opacity-40" />
         
         <header className="relative z-10 border-b border-purple-500/20 bg-gradient-to-br from-purple-500/10 via-slate-900 to-slate-950">
@@ -374,7 +374,7 @@ IMMUTABLE COMPLIANCE RECORD - DO NOT MODIFY
     <main className="relative min-h-screen pb-20 overflow-x-hidden bg-slate-950">
       {/* Background glows */}
       <div
-        className="absolute -left-32 top-20 h-72 w-72 rounded-full bg-purple-500/30 blur-3xl opacity-20"
+        className="absolute -left-32 top-20 h-72 w-72 rounded-full bg-purple-500/30 blur-xl opacity-20"
         style={{ pointerEvents: "none" }}
       />
       <div
