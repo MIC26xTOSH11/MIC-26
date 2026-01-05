@@ -1,118 +1,343 @@
-# LLM MalignOps Shield — Comprehensive Project Summary
 
-## Purpose & Scope
-- Provides an end-to-end MVP for detecting, analysing, and sharing intelligence on suspected malign information operations orchestrated by large language models.
-- Blends heuristic scoring, ML integrations, provenance checks, graph analytics, and sharing policies, surfacing results through both a FastAPI-powered analyst dashboard (`templates/dashboard.html`) and a standalone Next.js marketing/demo frontend (`frontend/`).
+# TattvaDrishti — Full Project Summary (MIC-26)
 
-## Core Capabilities
-- Narrative ingestion via REST (`POST /api/v1/intake`) with asynchronous event streaming (`/api/v1/events/stream`).
-- Hybrid detection engine combining stylometric heuristics, behavioural risk boosts, optional Hugging Face model scoring, and optional Ollama qualitative analysis (`app/models/detection.py`).
-- Provenance verification and watermarking heuristics to flag tampering (`app/models/watermark.py`).
-- Threat graph enrichment using NetworkX to map actors, regions, and narrative tags (`app/models/graph_intel.py`).
-- Policy-aware sharing package generation with deterministic signatures (`app/models/sharing.py`).
-- Persistent case storage and audit logging in SQLite (`app/storage/database.py`).
+This summary is meant to be the “single source of truth” for what the project does today: every major page and workflow in the Next.js app, plus the backend features that power them.
 
-## Tech Stack
-- **Backend:** Python 3, FastAPI (`app/main.py`), Pydantic models (`app/schemas.py`), Jinja2 templating, asyncio-based SSE streaming, SQLite persistence, packaged with Uvicorn (`requirements.txt`).
-- **Detection Integrations:** Optional Hugging Face transformer pipeline for AI-probability scoring (`app/integrations/hf_detector.py`) and optional Ollama CLI for qualitative risk assessment (`app/integrations/ollama_client.py`).
-- **Graph & Analytics:** NetworkX for relationship mapping and community snapshots, standard library heuristics for stylometrics.
-- **Frontend (showcase):** Next.js 14, React 18, Tailwind CSS, SWR-based data fetching, EventSource streaming (`frontend/app/page.js`, `frontend/lib/api.js`).
-- **Tooling & Tests:** Pytest for backend verification (`tests/test_detection.py`), optional Node.js workflow for the Next.js dashboard.
+If you want the full low-level backend reference (schemas, data flow, module details), see FULL_PROJECT_DOCUMENTATION.md.
 
-## Architecture & Data Flow
-1. **Intake:** External clients POST suspicious content to `/api/v1/intake` using the `ContentIntake` schema (`app/schemas.py`).
-2. **Orchestration:** `AnalysisOrchestrator` (`app/services/orchestrator.py`) fans out work to detection, provenance, graph, and storage layers synchronously inside a FastAPI-managed threadpool.
-3. **Detection Pipeline:** `DetectorEngine.detect()` (`app/models/detection.py`) extracts stylometric features, runs heuristics, adds behavioural boosts, and blends them with optional Hugging Face and Ollama probabilities to produce composite scores and classifications.
-4. **Provenance:** `WatermarkEngine.verify()` (`app/models/watermark.py`) checks for embedded watermark or signature markers, deriving fallback fingerprints if missing.
-5. **Graph Intelligence:** `GraphIntelEngine.ingest()` (`app/models/graph_intel.py`) updates a NetworkX graph linking content, actors, narrative tags, and regions, producing a `GraphSummary`.
-6. **Persistence & Audit:** `Database.save_case()` and `Database.log_action()` (`app/storage/database.py`) write case data and audit events into SQLite (`data/app.db`), ensuring tables exist on startup.
-7. **Event Stream:** Orchestrator pushes analysis-completed events onto an asyncio queue, streamed via `/api/v1/events/stream` to power live dashboards.
-8. **Case Retrieval & Sharing:** REST endpoints expose historical cases (`GET /api/v1/cases/{intake_id}`) and policy-tagged sharing packages (`POST /api/v1/share`).
+---
 
-## Backend Implementation Highlights
-- **Feature Extraction:** Token statistics (average token length, type-token ratio, hapax ratio), burstiness windows, uppercase rates, function-word coverage, and sentence length variance feed a weighted linear model with sigmoid activation.
-- **Heuristics:** Flags based on burstiness, lexical diversity, uppercase usage, threat-tag overlaps, suspect platforms, and high human-likeness signatures; heuristics appended to the result breakdown for analyst transparency.
-- **Score Blending:** Weighted aggregation of base stylometric score (0.5 weight), Hugging Face probability (0.35), and Ollama risk (0.15) with graceful handling when integrations are disabled.
-- **Behavioural Boosts:** Additional risk when metadata indicates high-risk regions (RU, IR, KP) or tracked influence tags.
-- **Classification Thresholds:** `high-risk` ≥ 0.75, `medium-risk` ≥ 0.45, `low-risk` otherwise.
-- **Watermark Checks:** Regex-driven detection of embedded watermark (`[[WM::{hash}]]`) and signature tokens (`[[SIG::{id}]]`), plus derived SHA-256-based fingerprints tied to `WATERMARK_SEED`.
-- **Graph Summaries:** Maintains actor/content/tag/region nodes, calculates high-risk actors by averaging neighbour scores, and snapshots connected communities for situational awareness.
-- **Sharing Engine:** Generates signed JSON envelopes, redacts PII unless `include_personal_data` is true, and applies jurisdictional policy tags (e.g., export control, privacy) plus justification hash.
+## 1) What the product is
 
-## API Surface
-- `POST /api/v1/intake` → Accepts `ContentIntake`; returns `DetectionResult` including composite score, classification, breakdown, provenance, and graph summary.
-- `GET /api/v1/cases/{intake_id}` → Fetches persisted case, rehydrates graph summary, responds with `DetectionResult`.
-- `POST /api/v1/share` → Takes `SharingRequest` and returns a signed `SharingPackage` (policy tags, payload, signature).
-- `GET /api/v1/events/stream` → Server-Sent Events feed emitting orchestrated pipeline updates.
-- `/` → Analyst dashboard (Jinja/Tailwind) for quick manual testing.
+TattvaDrishti is an Azure-first platform for detecting and mitigating malign information operations.
+It focuses on text-first narrative intake and turns each submission into an analyst-ready case with:
 
-### Backend Modules & Key Classes
-- `app/main.py` wires FastAPI routes, server-sent events, and middleware, instantiating a singleton `AnalysisOrchestrator` plus SQLite-backed `Database`.
-- `app/services/orchestrator.py` coordinates detection, provenance verification, NetworkX ingestion, audit logging, sharing package creation, and an asyncio queue (maxsize 200) for SSE broadcasting. Blocking pipeline work executes in a threadpool (`run_in_threadpool`) to keep the event loop responsive.
-- `app/models/detection.py` implements `DetectorEngine` with stylometric extraction, normalization, linear-weight scoring, heuristics, and blending with ML integrations. Key constants include `SUSPECT_PLATFORMS`, `HIGH_RISK_TAGS`, and `FUNCTION_WORDS`. Weighted coefficients (`avg_token_length` 0.9, `type_token_ratio` -1.3, etc.) mimic a trained linear classifier with bias -0.4.
-- `app/models/watermark.py` exposes `WatermarkEngine.verify()`, using regex (`[[WM::hash]]`, `[[SIG::ID]]`) and SHA-256/SHA-1 digests seeded by `WATERMARK_SEED` and `APP_SECRET` to validate provenance.
-- `app/models/graph_intel.py` holds `GraphIntelEngine`, storing actor/content/tag/region nodes, generating high-risk actor rankings via neighbour averaging, and summarising connected components as community snapshots.
-- `app/models/sharing.py` defines `SharingEngine` generating signed JSON envelopes, JSON-stringifying nested payloads, and tagging packages based on destination and privacy policy.
-- `app/storage/database.py` materialises tables `cases` and `audit_log` on startup, serialises payloads as JSON, and exposes helpers for case persistence and audit insertion. Database path defaults to `data/app.db`.
-- `app/integrations/hf_detector.py` and `ollama_client.py` wrap optional external models, providing graceful fallbacks and logging.
+- A composite Trust/Risk score
+- A clear classification label (low/medium/high/critical style buckets)
+- Explainability (“why was this flagged?”) including Azure reasoning + safety signals
+- Live event streaming for real-time dashboards
+- Analyst decision logging + immutable audit trail
+- Geo context (region required) and a world heatmap view
+- Enterprise-only operational reporting and exports
 
-## Configuration & Secrets
-- Centralised via `Settings` (`app/config.py`), loading from `.env` when present.
-- Key environment variables include `DATABASE_URL`, `HF_MODEL_NAME`, `HF_TOKENIZER_NAME`, `HF_DEVICE`, `HF_SCORE_THRESHOLD`, `OLLAMA_ENABLED`, `OLLAMA_MODEL`, `OLLAMA_TIMEOUT`, and `WATERMARK_SEED`.
-- Sample `.env` enables Hugging Face detector on GPU and turns on Ollama risk scoring with custom timeout.
+The system is split into a FastAPI backend under app/ and a Next.js 14 frontend under frontend/.
 
-## Data, Storage & Audit
-- SQLite database at `data/app.db` (auto-created) stores cases with full payload, breakdown, provenance, and timestamps.
-- Audit log table captures application actions (analysis completions, package generation) for compliance tracing.
-- Sample intake payload provided in `samples/intake_example.json` for quick manual testing.
+---
 
-### Database Schema Details
-- `cases` table columns: `intake_id` (PK), `raw_text`, `classification`, `composite_score`, `metadata_json`, `breakdown_json`, `provenance_json`, `created_at` (ISO string).
-- `audit_log` columns: autoincrement `id`, `intake_id`, `action`, `actor`, `payload` (JSON), `created_at`.
-- Writes are dispatched via context-managed SQLite connections with autocommit; directories for the DB are auto-created.
+## 2) User roles and access control
 
-## Frontend Experiences
-- **FastAPI Dashboard (`templates/dashboard.html`):** HTMX-free Tailwind interface that submits intakes, renders live SSE event feed, and lists recent analyses via vanilla JS.
-- **Next.js Dashboard (`frontend/app/page.js`):**
-  - Client-side React app showcasing landing hero, metrics, intake form, streaming events, case drill-down, and sharing package generation.
-  - API helper (`frontend/lib/api.js`) centralises REST calls and SSE connections, supporting configurable base URL via `NEXT_PUBLIC_API_BASE_URL`.
-  - Component library in `frontend/components/` (MetricCard, IntakeForm, CaseTable, CaseDetail, EventsFeed, Toast) emphasises productised analyst workflows.
+The project uses JWT auth in the backend and role/permission checks in the API.
 
-### Frontend Component Details
-- `IntakeForm.jsx` enforces a 20-character minimum narrative, normalises metadata fields, and resets state on successful submission.
-- `CaseTable.jsx` renders session-scoped analyses with formatted timestamps and highlighted selection states.
-- `CaseDetail.jsx` visualises detection breakdown (score bars for linguistic/behavioural/HF/Ollama), stylometric anomalies, heuristics, provenance notes, graph metrics, original submission metadata, and sharing controls (default justification + destination picker).
-- `EventsFeed.jsx` consumes the SSE stream, displaying live badges, score readouts, and timestamps with animated “streaming” indicator.
-- `MetricCard.jsx` and `Toast.jsx` deliver UI primitives for headline metrics and transient notifications.
-- Global styling is defined through Tailwind (via `frontend/app/globals.css` and `tailwind.config.js`); layout orchestrated in `frontend/app/layout.js`.
+### Roles
+- individual: analyst-grade core features (dashboard, analytics, upload)
+- enterprise: extended access (superuser, detailed reports, exports, submissions management)
 
-## Testing & Quality
-- Pytest suite currently covers `DetectorEngine` heuristics-only execution (`tests/test_detection.py`), ensuring classification and breakdown outputs stay within expected bounds when ML integrations are disabled.
-- Hugging Face integration gracefully degrades when models are unavailable, logged via `logging` warnings.
+### Permissions (high level)
+- view_dashboard
+- upload_content
+- view_analytics
+- view_superuser (enterprise)
+- manage_submissions (enterprise)
+- export_data (enterprise)
+- view_detailed_reports (enterprise)
 
-### Additional Quality Safeguards
-- `tests/test_detection.py` explicitly disables Hugging Face via env vars to validate heuristic fallback pathways.
-- `AnalysisOrchestrator` drops oldest SSE events if the queue is full, preventing backpressure.
-- `OllamaClient` limits prompt size (1200 chars), enforces CLI timeout, and attempts JSON recovery from unstructured model responses.
+Frontend auth is handled via frontend/lib/auth.js and stores the JWT in localStorage.
 
-## Integrations & Model Usage
-- **Hugging Face:** Defaults to `roberta-base-openai-detector` for AI-vs-human classification; configurable via `HF_MODEL_NAME`/`HF_TOKENIZER_NAME`. Uses `transformers.pipeline` with optional GPU (`HF_DEVICE`) and supports local path overrides. Machine-generated probability extracted by scanning labels for `LABEL_1`, `AI`, `LLM`, etc.
-- **Ollama:** Optional local model (default `mistral`; sample `.env` uses `gemma3n:e4b`) providing qualitative risk JSON (`{ "risk": float, "justification": str }`). CLI invoked with configurable timeout, disabled unless `OLLAMA_ENABLED=true`.
-- **Stylometric Model:** Heuristic linear blend combining feature weights (`avg_token_length` 0.9, `burstiness` 1.2, `type_token_ratio` -1.3, `sentence_length_var` 0.8, `function_word_ratio` -0.7, `uppercase_ratio` 0.6) plus bias (-0.4) and hapax penalty/bonus adjustments. Sigmoid transforms produce interpretable [0,1] scores.
-- **Behavioural Rules:** Region risk boost (+0.15 for RU/IR/KP), tag-based increments (+0.05 per high-risk tag capped at +0.5). Classification thresholds: high (≥0.75), medium (≥0.45), low (<0.45).
+---
 
-## Detection Heuristics & Feature Engineering
-- Tokenisation via regex `\b\w+\b`; burstiness measured in 10-token windows; sentence variance computed with `statistics.variance`.
-- Feature normalisation clamps metrics to defensible ranges (e.g., `avg_token_length/8 ≤ 1.5`, tanh-squashed sentence variance).
-- Human-likeness bonus up to 0.28 for high type-token ratios (>0.52), hapax ratio (>0.38), function-word coverage (>0.14), and rich sentence variance (>35).
-- Heuristics triggered for high burstiness (>0.65), low lexical diversity (<0.35), uppercase spikes (>0.12), multiple URLs (>3 `http` occurrences), suspect platforms, tracked narratives, or convincing human stylometry (balanced lexical stats).
-- Detection breakdown surfaces stylometric anomaly readings (rounded to 3 decimals) and heuristic strings for analyst transparency.
+## 3) Frontend features (Next.js)
 
-## Development & Operations
-- **Backend Workflow:** `python3 -m venv .venv`, `pip install -r requirements.txt`, then `uvicorn app.main:app --reload`.
-- **Frontend Workflow:** `cd frontend`, `npm install`, `npm run dev` (expects backend at `http://localhost:8000` or override with `NEXT_PUBLIC_API_BASE_URL`).
-- SSE stream, database files, and optional Ollama subprocess calls run locally; no external queueing system required for MVP.
+The frontend is a multi-page analyst product (not a single dashboard screen). It includes marketing/landing, auth, analyst dashboards, analytics, case browsing, bulk upload, and an enterprise admin view.
 
-## Extensibility & Roadmap
-- Architecture doc (`docs/architecture.md`) outlines future enhancements: swapping to fine-tuned detectors, integrating live intel feeds, blockchain-backed sharing receipts, and multimodal watermarking.
-- Orchestrator and model abstractions are designed for drop-in replacement of detection engines, graph analytics, and sharing policy modules without altering the FastAPI interface.
+### 3.1 Landing & marketing experience
+
+Routes:
+- / (frontend/app/page.js): primary landing page
+- /enhanced-landing (frontend/app/enhanced-landing/page.js): animation-heavy variant
+
+Key sections and features:
+- Hero with product positioning + CTA to Sign up
+- Feature grid describing capabilities (real-time scoring, intake sources, analytics, ledger messaging)
+- Analytics teaser section anchor
+- Team section using a horizontally scrolling TeamGrid with flip cards
+- FAQ section
+- Hamburger menu overlay navigation
+
+Landing animations (documented in LANDING_PAGE_ANIMATIONS.md):
+- BlobCanvas: morphing canvas blobs
+- HexGrid: scroll-reactive hex beehive grid
+- WebGLOrbs: Three.js orbs + menu burst
+- GSAP ScrollTrigger effects: parallax + velocity “warp”
+
+### 3.2 Authentication UX
+
+Routes:
+- /login (frontend/app/login/page.tsx)
+- /signup (frontend/app/signup/page.tsx)
+
+Features:
+- Sign up creates an account via POST /api/v1/auth/signup
+- Sign in returns a JWT via POST /api/v1/auth/login
+- Session hydration via GET /api/v1/auth/me
+- Pages like /dashboard and /upload redirect to /login when unauthenticated
+
+### 3.3 Advanced analyst dashboard
+
+Route:
+- /dashboard (frontend/app/dashboard/page.js)
+
+Core widgets and workflows:
+- Quick stats: total analyses, malicious/suspicious/benign counts, average score, last updated
+- Theme toggle (dark/light)
+- Quick intake submission (structured payload: language, tags, platform, city/region)
+- Live activity feed (SSE) with reconnect toast behavior
+- World heatmap map panel
+- Recent cases list + selection → case detail view
+
+Live updates:
+- Uses Server-Sent Events from GET /api/v1/events/stream
+- “Hydrates” each event into full case detail via GET /api/v1/cases/{id}
+
+### 3.4 Case details and analyst actions
+
+Component:
+- frontend/components/CaseDetail.jsx
+
+Displayed information (high-level):
+- Case header: intake id, timestamp, classification badge, composite score dial
+- Explainability panel assembled from available signals:
+  - Azure OpenAI GPT-4 reasoning (plain-English)
+  - Azure Content Safety flagged categories (if present)
+  - AI probability (if present)
+  - Top heuristic triggers
+  - Behavioral risk signal (if present)
+- Deep breakdown panels:
+  - stylometric anomalies (token stats, cadence, etc.)
+  - heuristics list
+  - provenance + watermark notes (when available)
+  - graph intelligence summary (communities, clusters, coordination alerts, propagation chains)
+
+Analyst decision workflow:
+- Flag / Monitor / Escalate / Dismiss actions
+- Optional analyst notes
+- Writes to the backend audit trail via POST /api/v1/cases/{id}/decision
+- Audit trail fetch + display via GET /api/v1/cases/{id}/audit (enterprise permission)
+
+Note: “sharing package generation” is intentionally disabled in the current UI client and API wrapper (see frontend/lib/api.js).
+
+### 3.5 Submissions and case browser
+
+Route:
+- /submissions (frontend/app/submissions/page.js)
+
+Features:
+- Paginated-ish list loading (limit=100)
+- Real-time updates via SSE + case hydration
+- Filters: all / malicious / suspicious / benign
+- Search: by intake id, source, platform, region
+- Deep-link support: /submissions?case=<id> auto-selects and scrolls to the case detail panel
+
+### 3.6 Bulk upload and batch analysis (enterprise-only)
+
+Route:
+- /upload (frontend/app/upload/page.js)
+
+Enterprise gating:
+- If the user is not enterprise, shows an UpgradePrompt instead of the upload UI
+
+File ingestion:
+- Drag-and-drop zone supports .eml, .json, .txt, .html, .pdf
+- Metadata extraction:
+  - EML: From + Subject parsing + header/body separation
+  - JSON: reads text/content + platform + author/user + location + hashtags
+- Language selection per file (multi-language list)
+- Region selection required per file before analysis
+- Batch processing loop submits each file via POST /api/v1/intake
+- Per-file success/error reporting
+
+### 3.7 Analytics (interactive)
+
+Route:
+- /analytics (frontend/app/analytics/page.js)
+
+Charts and computations (Recharts):
+- Time range filters: 24h / 7d / 30d / all
+- Classification breakdown and trends
+- Score distribution
+- Platform breakdown
+- Region ranking (top 10)
+- Enterprise analytics derived from breakdown fields when present:
+  - consumer vulnerability risk buckets
+  - top recommended actions
+  - Azure signal averages (OpenAI risk, Content Safety score)
+  - radar-style “signal contribution” averages
+- Live updates via SSE with hydration
+
+### 3.8 Superuser (enterprise admin)
+
+Route:
+- /superuser (frontend/app/superuser/page.js)
+
+Capabilities:
+- Enterprise-only visibility based on view_detailed_reports permission
+- Time-range analytics summary: volume, classification counts, average score, top regions, trend
+- World heatmap
+- System monitor panel
+- Report generators (downloads as plain text files):
+  - Executive risk intelligence brief
+  - Threat trend & exposure analysis
+  - Content safety & policy compliance assessment
+
+### 3.9 Guided “simple” dashboard
+
+Route:
+- /simple (frontend/app/simple/page.js)
+
+Purpose:
+- A calmer, lower-density UX for quick narrative checks
+
+Features:
+- Live SSE stream with auto-reconnect
+- Intake form (same structured schema)
+- Quick metrics cards
+- Result list + case overview
+- ImageAnalyzer panel for quick image moderation-style checks
+
+---
+
+## 4) Theming, color system, and UI primitives
+
+### Tailwind + CSS variables
+- Tailwind is used for layout, typography, spacing, and most component styling.
+- frontend/app/globals.css defines:
+  - global CSS variables (HSL tokens like --background/--foreground)
+  - custom component layers (e.g., gradient-button)
+  - light-mode overrides via :root[data-theme="light"] and body[data-theme="light"]
+
+### Theme toggling
+- frontend/components/ThemeToggle.jsx sets data-theme=dark|light on both <html> and <body>
+- Theme preference is persisted in localStorage (key: theme)
+
+### Visual language used across the app
+- Dark-first “investigative” UI with emerald/cyan accents
+- Glassmorphism surfaces (semi-transparent panels + blur)
+- Gradient accents for primary CTAs and key status indicators
+
+---
+
+## 5) Backend features (FastAPI)
+
+### 5.1 Authentication
+
+Endpoints:
+- POST /api/v1/auth/signup: create account (individual or enterprise)
+- POST /api/v1/auth/login: returns JWT
+- GET /api/v1/auth/me: returns username, role, permissions
+
+Implementation notes:
+- Supports default demo users via environment variables (USER_<name>=<pass>:<role>) and/or DB users.
+- JWT is signed with JWT_SECRET_KEY (default value should be overridden in production).
+
+### 5.2 Core analysis pipeline
+
+Endpoint:
+- POST /api/v1/intake
+
+Key behaviors:
+- Validates content length (>= 20 chars via schema) and requires region (city/district)
+- Runs orchestrator pipeline and returns a DetectionResult
+- Writes the case into SQLite
+- Emits an SSE event so dashboards update in real time
+- Attempts heatmap recording in a non-blocking way
+
+### 5.3 Case management + audit trail
+
+Endpoints:
+- GET /api/v1/cases: list recent cases (limit param)
+- GET /api/v1/cases/{id}: fetch full case data
+- POST /api/v1/cases/{id}/decision: record analyst decision (flag/monitor/escalate/dismiss)
+- GET /api/v1/cases/{id}/audit: immutable audit trail (enterprise permission)
+- GET /api/v1/export/cases: export cases (enterprise permission)
+
+### 5.4 Live streaming
+
+Endpoint:
+- GET /api/v1/events/stream
+
+Notes:
+- Server-Sent Events (EventSource friendly)
+- Used by /dashboard, /submissions, /analytics, and /simple for live updates
+
+### 5.5 GeoIP location detection
+
+Endpoint:
+- GET /api/v1/location
+
+Notes:
+- Uses MaxMind GeoLite2 City database (data/GeoLite2-City.mmdb)
+- Handles proxy headers (X-Forwarded-For, X-Real-IP) for Azure deployments
+
+### 5.6 Heatmap storage
+
+Endpoints:
+- POST /api/v1/heatmap/add-risk-point
+- GET /api/v1/heatmap/grid
+
+Notes:
+- Persists points in data/heatmap_points.json
+- Region-to-lat/lon mapping is controlled via an in-file REGION_COORDS map
+
+### 5.7 Threat intelligence exports
+
+Endpoints:
+- GET /api/v1/integrations/threat-intel
+- GET /api/v1/integrations/siem
+
+Purpose:
+- Provide integration-friendly summaries derived from the graph intelligence layer
+
+---
+
+## 6) Scoring and explainability (signals)
+
+The project blends multiple signals into an enterprise trust risk score.
+Based on the current product positioning (see README.md), the default weighting is:
+
+- Azure OpenAI semantic risk (40%)
+- Azure Content Safety (25%)
+- Hugging Face AI detection (20%)
+- Behavioral & stylometric analysis (15%)
+
+What analysts see:
+- Composite score and classification
+- Plain-language “reasoning” when Azure OpenAI is enabled
+- Safety categories/flags when Content Safety is enabled
+- Heuristic triggers and stylometric anomalies
+
+---
+
+## 7) Data storage
+
+- SQLite (data/app.db): cases, users, audit trail
+- Heatmap file (data/heatmap_points.json): world heatmap points
+- GeoIP database (data/GeoLite2-City.mmdb): optional IP → location lookup
+
+---
+
+## 8) Tests
+
+Backend tests live under tests/ and include:
+- test_detection.py
+- test_language_normalization.py
+- test_sharing.py (note: sharing UI/API is currently disabled; this test may reflect earlier iterations)
+
+---
+
+## 9) Key docs to read next
+
+- FULL_PROJECT_DOCUMENTATION.md (deep system reference)
+- README.md (quick start + env setup)
+- LANDING_PAGE_ANIMATIONS.md (landing animation architecture)
+- docs/architecture.md (architecture notes)
+- app/APP_OVERVIEW.md, app/integrations/INTEGRATIONS_OVERVIEW.md, app/auth/AUTH_OVERVIEW.md (module overviews)
+
