@@ -25,10 +25,7 @@ import {
 } from "lucide-react";
 
 // Dynamic imports for animation components
-const BlobCanvas = dynamic(() => import('@/components/BlobCanvas'), { ssr: false });
-const HexGrid = dynamic(() => import('@/components/HexGrid'), { ssr: false });
 const WebGLOrbs = dynamic(() => import('@/components/WebGLOrbs'), { ssr: false });
-const LandingHoneycombBackground = dynamic(() => import('@/components/LandingHoneycombBackground'), { ssr: false });
 const GlowingEffect = dynamic(() => import('@/components/ui/glowing-effect').then(mod => ({ default: mod.GlowingEffect })), { ssr: false });
 
 if (typeof window !== 'undefined') {
@@ -37,7 +34,6 @@ if (typeof window !== 'undefined') {
 
 export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [scrollProgress, setScrollProgress] = useState(0);
   const { user, loading } = useAuth();
   const router = useRouter();
   const mainRef = useRef(null);
@@ -64,8 +60,6 @@ export default function LandingPage() {
       onUpdate: (self) => {
         if (!ticking) {
           requestAnimationFrame(() => {
-            setScrollProgress(self.progress);
-            
             // Zero-G jelly effect based on scroll velocity (softer, steadier)
             const rawVelocity = self.getVelocity() / 1000;
             const clampedVelocity = Math.max(-1.2, Math.min(1.2, rawVelocity));
@@ -137,10 +131,7 @@ export default function LandingPage() {
       }}
     >
       {/* Animated Background Layers */}
-      <BlobCanvas />
-      <HexGrid />
       <WebGLOrbs isMenuOpen={menuOpen} />
-      <LandingHoneycombBackground />
 
       {/* Cosmic Background Effect */}
       <div className="fixed inset-0 pointer-events-none z-0">
