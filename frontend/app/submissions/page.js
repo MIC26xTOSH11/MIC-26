@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import CaseTable from "@/components/CaseTable";
 import CaseDetail from "@/components/CaseDetail";
 import Toast from "@/components/Toast";
@@ -24,6 +25,9 @@ function bucketizeClassification(value) {
 }
 
 export default function SubmissionsPage() {
+  const searchParams = useSearchParams();
+  const caseIdFromUrl = searchParams.get('case');
+  
   const [results, setResults] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [toast, setToast] = useState({ message: "", tone: "success" });
@@ -36,6 +40,26 @@ export default function SubmissionsPage() {
         const data = await listCases(100);
         if (data.cases && data.cases.length > 0) {
           setResults(sortResults(data.cases));
+          
+          // If a case ID was provided in URL, auto-select it
+          if (caseIdFromUrl) {
+            setSelectedId(caseIdFromUrl);
+            // Try to fetch full case details
+            try {
+              const caseDetails = await fetchCase(caseIdFromUrl);
+              if (caseDetails) {
+                // Scroll to case detail after a short delay
+                setTimeout(() => {
+                  const detailElement = document.getElementById('case-detail');
+                  if (detailElement) {
+                    detailElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }, 300);
+              }
+            } catch (error) {
+              console.error("Failed to load case from URL:", error);
+            }
+          }
         }
       } catch (error) {
         setToast({
@@ -66,7 +90,7 @@ export default function SubmissionsPage() {
     );
 
     return () => source.close();
-  }, []);
+  }, [caseIdFromUrl]);
 
   const upsertResult = (result) => {
     if (!result || !result.intake_id) return;
@@ -247,7 +271,7 @@ export default function SubmissionsPage() {
         </div>
 
         {/* Case Detail */}
-        <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-6 shadow-2xl shadow-black/30">
+        <div id="case-detail" className="rounded-3xl border border-white/10 bg-slate-900/70 p-6 shadow-2xl shadow-black/30">
           {selectedCase ? (
             <CaseDetail caseData={selectedCase} />
           ) : (
