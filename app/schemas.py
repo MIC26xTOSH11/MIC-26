@@ -103,6 +103,7 @@ class DetectionResult(BaseModel):
     submitted_at: datetime
     composite_score: float
     classification: str
+    raw_text: Optional[str] = None
     breakdown: DetectionBreakdown
     provenance: ProvenancePayload
     graph_summary: GraphSummary

@@ -3,6 +3,8 @@
 
 This summary is meant to be the “single source of truth” for what the project does today: every major page and workflow in the Next.js app, plus the backend features that power them.
 
+For a consolidated inventory of **all features** (small UX details like theming/animations, plus critical detection features like payload text analysis), see: `docs/FEATURES_AND_UX_SUMMARY.md`.
+
 If you want the full low-level backend reference (schemas, data flow, module details), see FULL_PROJECT_DOCUMENTATION.md.
 
 ---

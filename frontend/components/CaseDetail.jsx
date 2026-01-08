@@ -35,26 +35,12 @@ export default function CaseDetail({
   const [auditTrail, setAuditTrail] = useState([]);
   const [showAuditTrail, setShowAuditTrail] = useState(false);
 
-  const metadataEntries = useMemo(() => {
-    if (!submission?.metadata) return [];
-    return Object.entries(submission.metadata).filter(([, value]) => Boolean(value));
-  }, [submission]);
-
   const breakdown = caseData?.breakdown || {};
   const provenance = caseData?.provenance || {};
   const graphSummary = caseData?.graph_summary || {};
   const stylometric = breakdown.stylometric_anomalies || {};
   const heuristics = breakdown.heuristics || [];
   const graphCommunities = graphSummary.communities;
-  const gnnClusters = Array.isArray(graphSummary.gnn_clusters)
-    ? graphSummary.gnn_clusters
-    : [];
-  const coordinationAlerts = Array.isArray(graphSummary.coordination_alerts)
-    ? graphSummary.coordination_alerts
-    : [];
-  const propagationChains = Array.isArray(graphSummary.propagation_chains)
-    ? graphSummary.propagation_chains
-    : [];
   const communitySummaries = useMemo(() => {
     const communities = Array.isArray(graphCommunities) ? graphCommunities : [];
     return communities.map((community) => {
@@ -706,14 +692,13 @@ export default function CaseDetail({
         <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
           Graph intelligence snapshot
         </h3>
-        <div className="mt-4 grid grid-cols-2 gap-3 text-center text-sm text-slate-200 md:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 text-center text-sm text-slate-200 md:grid-cols-3">
           <StatCard label="Nodes" value={graphSummary.node_count} />
           <StatCard label="Edges" value={graphSummary.edge_count} />
           <StatCard
             label="Communities"
             value={Array.isArray(graphSummary.communities) ? graphSummary.communities.length : 0}
           />
-          <StatCard label="GNN clusters" value={gnnClusters.length} />
         </div>
         <div className="mt-4 space-y-2 text-xs text-slate-400">
           {Array.isArray(graphSummary.communities) && graphSummary.communities.length ? (
@@ -752,182 +737,13 @@ export default function CaseDetail({
 
       <section className="rounded-2xl border border-white/10 bg-slate-950/60 px-5 py-5">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
-          GNN cluster detections
-        </h3>
-        {gnnClusters.length ? (
-          <div className="mt-4 space-y-3 text-xs text-slate-300">
-            {gnnClusters.map((cluster) => (
-              <article
-                key={cluster.cluster_id}
-                className="rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3"
-              >
-                <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.35em] text-slate-500">
-                  <span>{cluster.cluster_id}</span>
-                  <span className="text-emerald-300">{(cluster.score ?? 0).toFixed(2)}</span>
-                </div>
-                <div className="mt-3 space-y-1 text-[13px]">
-                  {cluster.actors?.length ? (
-                    <p>
-                      <span className="text-slate-500">Actors:</span>
-                      <span className="ml-2 font-mono text-emerald-200">
-                        {cluster.actors.join(", ")}
-                      </span>
-                    </p>
-                  ) : null}
-                  {cluster.narratives?.length ? (
-                    <p>
-                      <span className="text-slate-500">Narratives:</span>
-                      <span className="ml-2 font-mono text-cyan-200">
-                        {cluster.narratives.join(", ")}
-                      </span>
-                    </p>
-                  ) : null}
-                  {cluster.content?.length ? (
-                    <p>
-                      <span className="text-slate-500">Content:</span>
-                      <span className="ml-2 font-mono text-amber-200">
-                        {cluster.content.join(", ")}
-                      </span>
-                    </p>
-                  ) : null}
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-4 text-xs text-slate-500">
-            No GNN-driven communities have been scored yet for this case.
-          </p>
-        )}
-      </section>
-
-      <section className="rounded-2xl border border-white/10 bg-slate-950/60 px-5 py-5">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
-          Cross-platform coordination alerts
-        </h3>
-        {coordinationAlerts.length ? (
-          <div className="mt-4 space-y-3 text-xs text-slate-300">
-            {coordinationAlerts.map((alert, index) => (
-              <article
-                key={`${alert.actor}-${index}`}
-                className="rounded-xl border border-white/10 bg-slate-900/60 px-4 py-4"
-              >
-                <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.35em] text-slate-500">
-                  <span>{alert.actor}</span>
-                  <span className="text-rose-200">Risk {(alert.risk ?? 0).toFixed(2)}</span>
-                </div>
-                <div className="mt-3 space-y-1 text-[13px]">
-                  {alert.peer_actors?.length ? (
-                    <p>
-                      <span className="text-slate-500">Peers:</span>
-                      <span className="ml-2 font-mono text-emerald-200">
-                        {alert.peer_actors.join(", ")}
-                      </span>
-                    </p>
-                  ) : null}
-                  {alert.shared_tags?.length ? (
-                    <p>
-                      <span className="text-slate-500">Shared narratives:</span>
-                      <span className="ml-2 font-mono text-cyan-200">
-                        {alert.shared_tags.join(", ")}
-                      </span>
-                    </p>
-                  ) : null}
-                  {alert.platforms?.length ? (
-                    <p>
-                      <span className="text-slate-500">Platforms:</span>
-                      <span className="ml-2 font-mono text-amber-200">
-                        {alert.platforms.join(", ")}
-                      </span>
-                    </p>
-                  ) : null}
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-4 text-xs text-slate-500">
-            No coordination signals flagged between actors for this intake.
-          </p>
-        )}
-      </section>
-
-      <section className="rounded-2xl border border-white/10 bg-slate-950/60 px-5 py-5">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
-          Propagation chains
-        </h3>
-        {propagationChains.length ? (
-          <div className="mt-4 space-y-3 text-xs text-slate-300">
-            {propagationChains.map((chain, index) => (
-              <article
-                key={`${chain.path?.join("-") || "chain"}-${index}`}
-                className="rounded-xl border border-white/10 bg-slate-900/60 px-4 py-4"
-              >
-                <p className="font-mono text-[12px] text-emerald-200">
-                  {(chain.path || []).join(" → ") || "No path computed"}
-                </p>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[12px] text-slate-400">
-                  <span>Likelihood {(chain.likelihood ?? 0).toFixed(2)}</span>
-                  <span>
-                    Platforms: <span className="font-mono text-amber-200">{(chain.platforms || []).join(", ") || "n/a"}</span>
-                  </span>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-4 text-xs text-slate-500">
-            Propagation modelling has not surfaced any cross-actor handoffs.
-          </p>
-        )}
-      </section>
-
-      <section className="rounded-2xl border border-white/10 bg-slate-950/60 px-5 py-5">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
           Submitted payload
         </h3>
-        <div className="mt-4 space-y-3 text-sm text-slate-200">
-          <p className="rounded-xl border border-white/5 bg-slate-900/60 px-4 py-3 text-slate-100">
-            {submission?.text || "Source text not available in this session."}
-          </p>
-          <div className="grid grid-cols-2 gap-3 text-xs text-slate-300">
-            {metadataEntries.length ? (
-              metadataEntries.map(([key, value]) => (
-                <div
-                  key={key}
-                  className="rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2"
-                >
-                  <p className="text-[10px] uppercase tracking-[0.35em] text-slate-400">
-                    {key.replace(/_/g, " ")}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-200">
-                    {typeof value === "string" ? value : JSON.stringify(value)}
-                  </p>
-                </div>
-              ))
-            ) : (
-              <p className="col-span-2 text-xs text-slate-500">
-                Metadata was not captured for this intake.
-              </p>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2 text-xs text-emerald-200">
-            {Array.isArray(submission?.tags) && submission.tags.length ? (
-              submission.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1"
-                >
-                  {tag}
-                </span>
-              ))
-            ) : (
-              <span className="text-xs text-slate-500">
-                No analyst tags applied.
-              </span>
-            )}
-          </div>
-        </div>
+        <p className="mt-3 rounded-xl border border-white/5 bg-slate-900/60 px-4 py-3 text-sm text-slate-100 whitespace-pre-wrap break-words">
+          {typeof caseData.raw_text === "string"
+            ? caseData.raw_text
+            : "Loading payload text…"}
+        </p>
       </section>
 
       {/* Sharing section removed - focusing on text disinformation MVP */}

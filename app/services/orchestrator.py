@@ -76,6 +76,7 @@ class AnalysisOrchestrator:
             submitted_at=submitted_at,
             composite_score=composite_score,
             classification=classification,
+            raw_text=intake.text,
             breakdown=breakdown,
             provenance=provenance,
             graph_summary=graph_summary,

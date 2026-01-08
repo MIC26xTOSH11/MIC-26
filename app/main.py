@@ -357,6 +357,7 @@ async def get_case(request: Request, intake_id: str):
             "submitted_at": record["created_at"],
             "composite_score": record["composite_score"],
             "classification": record["classification"],
+            "raw_text": record.get("raw_text"),
             "breakdown": record["breakdown"],
             "provenance": record["provenance"],
             "graph_summary": graph_snapshot.dict(),
